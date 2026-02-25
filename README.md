@@ -5,17 +5,14 @@ AlertNest is a centralized, AI-enabled incident management platform designed to 
 
 It enables structured incident reporting, intelligent prioritization, real-time tracking, and role-based dashboard management through a scalable backend architecture.
 
-⸻
-
-Problem Statement
-
 Universities and large campuses handle daily incidents such as safety concerns, infrastructure faults, equipment failures, sanitation issues, and emergency situations. These issues are often reported through fragmented channels like phone calls, emails, or messaging groups, leading to delayed responses, lack of accountability, and poor coordination across departments.
 
 AlertNest addresses this challenge by providing a centralized, backend-driven incident reporting system with AI-based severity classification and structured lifecycle management.
 
-⸻
+
 
 Key Features
+
 	•	Structured Incident Reporting
 	•	JWT-Based Authentication with Role-Based Access Control
 	•	AI-Based Severity Classification (Low / Medium / High)
@@ -24,11 +21,11 @@ Key Features
 	•	Audit Trail and Status Logs
 	•	Analytics and Incident Insights
 	•	Cloud Deployment Ready Architecture
-
-⸻
+	
 
 System Architecture
 
+```
 React Frontend
       ↓
 FastAPI Backend
@@ -36,37 +33,43 @@ FastAPI Backend
 AI Severity Classification Module
       ↓
 MongoDB Atlas
+```
 
 AlertNest follows a backend-centric REST architecture where validation, classification, lifecycle logic, and data management are handled in the backend layer.
 
-⸻
 
 Tech Stack
 
 Frontend
+
 	•	React.js
 	•	Tailwind CSS
 
 Backend
+
 	•	Python
 	•	FastAPI
 	•	Uvicorn
 
 Database
+
 	•	MongoDB Atlas
 
 Authentication
+
 	•	JWT (JSON Web Tokens)
 	•	python-jose
 	•	passlib
 
 Deployment
+
 	•	Backend hosted on Render
 	•	Frontend hosted on Vercel
 
-⸻
+
 
 How It Works
+
 	1.	User logs in as Student, Staff, or Admin.
 	2.	User submits an incident with category, description, and location.
 	3.	Backend validates request and authenticates the user.
@@ -77,29 +80,33 @@ How It Works
 	8.	Department updates status until resolution.
 	9.	Full audit trail is maintained throughout the lifecycle.
 
-⸻
+
 
 User Roles
 
 Student / Staff
+
 	•	Submit incidents
 	•	View and track submitted incidents
 
 Admin
+
 	•	View all incidents
 	•	Assign departments
 	•	Update status
 	•	Access analytics dashboard
 
-⸻
+
 
 API Overview
 
 Authentication
+
 	•	POST /api/register
 	•	POST /api/login
 
 Incident Management
+
 	•	POST /api/incidents
 	•	GET /api/incidents
 	•	GET /api/incidents/{id}
@@ -107,23 +114,26 @@ Incident Management
 	•	PUT /api/incidents/{id}/status
 
 Dashboard
+
 	•	GET /api/dashboard/summary
 	•	GET /api/dashboard/analytics
 
-⸻
+
 
 Testing Strategy
+
 	•	Manual functional testing of APIs
 	•	Role-based access validation
 	•	Incident lifecycle validation
 	•	Concurrent API request handling tests
 	•	Performance monitoring of dashboard endpoints
 
-⸻
+
 
 Target Market
 
 AlertNest is designed for:
+
 	•	Public and Private Universities
 	•	Engineering and Medical Colleges
 	•	Residential Campuses with Hostels
