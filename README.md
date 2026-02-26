@@ -1,15 +1,146 @@
-# AlertNest 🚨
+# AlertNest
+Backend-Centric Incident Reporting Platform for Universities & Large Campuses
 
-A real-time disaster alert and emergency notification system designed to provide timely warnings and safety information during natural disasters and emergencies.
+AlertNest is a centralized, AI-enabled incident management platform designed to improve safety, accountability, and operational efficiency within universities and large institutional campuses.
 
-## 📋 Project Overview
+It enables structured incident reporting, intelligent prioritization, real-time tracking, and role-based dashboard management through a scalable backend architecture.
 
-AlertNest is a comprehensive disaster management platform that delivers:
-- Real-time disaster alerts and notifications
-- Location-based emergency information
-- Multi-channel communication (SMS, email, push notifications)
-- Emergency resource mapping
-- Community safety updates
+Universities and large campuses handle daily incidents such as safety concerns, infrastructure faults, equipment failures, sanitation issues, and emergency situations. These issues are often reported through fragmented channels like phone calls, emails, or messaging groups, leading to delayed responses, lack of accountability, and poor coordination across departments.
+
+AlertNest addresses this challenge by providing a centralized, backend-driven incident reporting system with AI-based severity classification and structured lifecycle management.
+
+
+
+Key Features
+
+	•	Structured Incident Reporting
+	•	JWT-Based Authentication with Role-Based Access Control
+	•	AI-Based Severity Classification (Low / Medium / High)
+	•	Admin and Department Dashboards
+	•	Incident Lifecycle Management (Reported → In Progress → Resolved)
+	•	Audit Trail and Status Logs
+	•	Analytics and Incident Insights
+	•	Cloud Deployment Ready Architecture
+	
+
+System Architecture
+
+```
+React Frontend
+      ↓
+FastAPI Backend
+      ↓
+AI Severity Classification Module
+      ↓
+MongoDB Atlas
+```
+
+AlertNest follows a backend-centric REST architecture where validation, classification, lifecycle logic, and data management are handled in the backend layer.
+
+
+Tech Stack
+
+Frontend
+
+	•	React.js
+	•	Tailwind CSS
+
+Backend
+
+	•	Python
+	•	FastAPI
+	•	Uvicorn
+
+Database
+
+	•	MongoDB Atlas
+
+Authentication
+
+	•	JWT (JSON Web Tokens)
+	•	python-jose
+	•	passlib
+
+Deployment
+
+	•	Backend hosted on Render
+	•	Frontend hosted on Vercel
+
+
+
+How It Works
+
+	1.	User logs in as Student, Staff, or Admin.
+	2.	User submits an incident with category, description, and location.
+	3.	Backend validates request and authenticates the user.
+	4.	AI module classifies severity level.
+	5.	Incident is stored in MongoDB.
+	6.	Admin dashboard updates with the new incident.
+	7.	Admin assigns the incident to the relevant department.
+	8.	Department updates status until resolution.
+	9.	Full audit trail is maintained throughout the lifecycle.
+
+
+
+User Roles
+
+Student / Staff
+
+	•	Submit incidents
+	•	View and track submitted incidents
+
+Admin
+
+	•	View all incidents
+	•	Assign departments
+	•	Update status
+	•	Access analytics dashboard
+
+
+
+API Overview
+
+Authentication
+
+	•	POST /api/register
+	•	POST /api/login
+
+Incident Management
+
+	•	POST /api/incidents
+	•	GET /api/incidents
+	•	GET /api/incidents/{id}
+	•	PUT /api/incidents/{id}/assign
+	•	PUT /api/incidents/{id}/status
+
+Dashboard
+
+	•	GET /api/dashboard/summary
+	•	GET /api/dashboard/analytics
+
+
+
+Testing Strategy
+
+	•	Manual functional testing of APIs
+	•	Role-based access validation
+	•	Incident lifecycle validation
+	•	Concurrent API request handling tests
+	•	Performance monitoring of dashboard endpoints
+
+
+
+Target Market
+
+AlertNest is designed for:
+
+	•	Public and Private Universities
+	•	Engineering and Medical Colleges
+	•	Residential Campuses with Hostels
+	•	Research Institutions
+	•	Large Academic Campuses
+
+---
 
 ## 🎯 Week-3 Setup Status
 
@@ -26,23 +157,9 @@ AlertNest is a comprehensive disaster management platform that delivers:
 
 ### Frontend Setup
 - [x] Frontend application initialized (React framework)
-- [ ] Basic component structure (in progress)
+- [x] Basic component structure
 
-## 🛠️ Tech Stack
-
-### Backend
-- **Framework**: Flask (Python)
-- **Database**: PostgreSQL
-- **ORM**: SQLAlchemy
-- **API**: RESTful
-
-### Frontend
-- **Framework**: React
-- **State Management**: Context API / Redux (TBD)
-- **Styling**: CSS / Tailwind CSS (TBD)
-- **HTTP Client**: Axios
-
-## 📁 Project Structure
+## 📁 Current Project Structure
 
 ```
 AlertNest/
@@ -61,39 +178,16 @@ AlertNest/
 └── README.md
 ```
 
-## 🚀 Getting Started
-
-### Prerequisites
-- Python 3.8+
-- Node.js 16+
-- PostgreSQL 12+
+## 🚀 Quick Start (Week-3 Setup)
 
 ### Backend Setup
 
-1. Navigate to backend directory:
 ```bash
 cd backend
-```
-
-2. Create virtual environment:
-```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-```
-
-3. Install dependencies:
-```bash
+source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
-```
-
-4. Create `.env` file:
-```bash
 cp .env.example .env
-# Edit .env with your configuration
-```
-
-5. Run the application:
-```bash
 python run.py
 ```
 
@@ -101,50 +195,13 @@ Backend will be available at `http://localhost:5000`
 
 ### Frontend Setup
 
-1. Navigate to frontend directory:
 ```bash
 cd frontend
-```
-
-2. Install dependencies:
-```bash
 npm install
-```
-
-3. Start development server:
-```bash
 npm start
 ```
 
 Frontend will be available at `http://localhost:3000`
-
-## 🔍 API Endpoints
-
-### Health Check
-- `GET /health` - Check if backend is running
-- `GET /api/ping` - Ping endpoint for connectivity test
-
-## 📅 Development Timeline
-
-- **Week 1-2**: Planning and PRD finalization
-- **Week 3**: Repository setup and basic scaffolding ✅
-- **Week 4-6**: Core feature development
-- **Week 7-9**: Integration and testing
-- **Week 10-11**: Refinement and optimization
-- **Week 12**: Final testing and deployment
-
-## 👥 Team
-
-- **Developer**: Tanzila Tahreem
-- **Mentor**: [Mentor Name]
-
-## 📝 License
-
-This project is part of an academic/training program.
-
-## 🤝 Contributing
-
-This is a learning project. Contributions and suggestions are welcome!
 
 ---
 
