@@ -1,0 +1,65 @@
+.App {
+  text-align: center;
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-header h1 {
+  margin: 0;
+  font-size: 3rem;
+}
+
+.App-header p {
+  margin: 10px 0;
+  font-size: 1.2rem;
+  color: #61dafb;
+}
+
+.status {
+  margin: 20px 0;
+  padding: 15px 30px;
+  background-color: #1e2127;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.info {
+  margin-top: 30px;
+  text-align: left;
+  background-color: #1e2127;
+  padding: 20px 40px;
+  border-radius: 8px;
+}
+
+.info p {
+  color: #4caf50;
+  font-weight: bold;
+  margin-bottom: 15px;
+}
+
+.info ul {
+  list-style: none;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+.info ul li {
+  padding: 5px 0;
+  color: #61dafb;
+}
+
+.info ul li:before {
+  content: "✓ ";
+  color: #4caf50;
+  font-weight: bold;
+  margin-right: 8px;
+}
