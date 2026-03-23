@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import SocialButtons from '../components/SocialButtons';
+import ForgotPassword from '../components/ForgotPassword';
 
 export default function Login({ onSwitch }) {
   const { login } = useAuth();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
+  const [showForgot, setShowForgot] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -19,6 +21,7 @@ export default function Login({ onSwitch }) {
 
   return (
     <div className="min-h-screen bg-teal-900 flex items-center justify-center p-6">
+      {showForgot && <ForgotPassword onClose={() => setShowForgot(false)} />}
       <div className="flex w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl">
 
         {/* Left Panel */}
@@ -61,7 +64,7 @@ export default function Login({ onSwitch }) {
                 className="flex-1 outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent" />
             </div>
             <div className="flex items-center justify-between mt-1">
-              <span className="text-teal-600 text-xs cursor-pointer hover:underline">Forgot Password?</span>
+              <span onClick={() => setShowForgot(true)} className="text-teal-600 text-xs cursor-pointer hover:underline">Forgot Password?</span>
               <button type="submit" className="bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold px-6 py-2 rounded-full transition">LOGIN</button>
             </div>
           </form>
