@@ -1,7 +1,5 @@
 import bcrypt
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
-from app.config import JWT_SECRET, JWT_ALGORITHM, JWT_EXPIRE_HOURS
+from firebase_admin import auth as firebase_auth
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -13,16 +11,10 @@ def hash_password(password: str) -> str:
 def verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode(), hashed.encode())
 
-def create_token(data: dict) -> str:
-    payload = data.copy()
-    payload["exp"] = datetime.utcnow() + timedelta(hours=JWT_EXPIRE_HOURS)
-    return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-
-def decode_token(token: str) -> dict:
-    try:
-        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-    except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-    return decode_token(credentials.credentials)
+    token = credentials.credentials
+    try:
+        decoded = firebase_auth.verify_id_token(token)
+        return decoded  # contains uid, email, name, etc.
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")

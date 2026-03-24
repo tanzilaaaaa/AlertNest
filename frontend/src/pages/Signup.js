@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { register } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import SocialButtons from '../components/SocialButtons';
 
 export default function Signup({ onSwitch }) {
+  const { register } = useAuth();
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'student' });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -12,17 +13,16 @@ export default function Signup({ onSwitch }) {
     setError('');
     setSuccess('');
     try {
-      await register(form);
-      setSuccess('Account created! You can now log in.');
+      await register(form.name, form.email, form.password, form.role);
+      setSuccess('Account created! Logging you in...');
     } catch (err) {
-      setError(err.response?.data?.detail || 'Registration failed');
+      setError(err.code === 'auth/email-already-in-use' ? 'Email already registered' : err.message);
     }
   };
 
   return (
     <div className="min-h-screen bg-teal-900 flex items-center justify-center p-6">
       <div className="flex w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl">
-
         {/* Left Panel */}
         <div className="relative w-2/5 bg-teal-600 flex flex-col items-start justify-center p-8 overflow-hidden">
           <div className="absolute w-56 h-56 bg-teal-500 rounded-3xl rotate-45 -top-10 -left-10 opacity-70" />
@@ -33,7 +33,6 @@ export default function Signup({ onSwitch }) {
             <button className="bg-white text-teal-800 font-bold px-6 py-2 rounded-full text-sm shadow">SIGN UP</button>
           </div>
         </div>
-
         {/* Right Panel */}
         <div className="w-3/5 bg-white flex flex-col items-center justify-center px-10 py-10">
           <div className="bg-teal-600 rounded-full p-4 mb-3">
@@ -42,10 +41,8 @@ export default function Signup({ onSwitch }) {
             </svg>
           </div>
           <h2 className="text-2xl font-bold text-teal-700 mb-6">SIGN UP</h2>
-
           {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
           {success && <p className="text-teal-600 text-sm mb-3">{success}</p>}
-
           <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5">
             <div className="flex items-center border-b border-gray-300 pb-1">
               <svg className="mr-2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
@@ -74,7 +71,6 @@ export default function Signup({ onSwitch }) {
             <div className="flex items-center border-b border-gray-300 pb-1">
               <svg className="mr-2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
               <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
                 className="flex-1 outline-none text-sm text-gray-700 bg-transparent">
@@ -87,9 +83,7 @@ export default function Signup({ onSwitch }) {
               <button type="submit" className="bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold px-6 py-2 rounded-full transition">SIGN UP</button>
             </div>
           </form>
-
           <SocialButtons onError={setError} label="Sign Up" />
-
           <p className="text-xs text-gray-400 mt-4">
             Already have an account?{' '}
             <button onClick={onSwitch} className="text-teal-600 font-semibold hover:underline">Login</button>

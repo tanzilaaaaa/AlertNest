@@ -36,7 +36,7 @@ async def create_incident(data: IncidentCreate, current_user: dict = Depends(get
         "location": data.location,
         "severity": classify_severity(data.description),
         "status": "reported",
-        "reported_by": current_user["user_id"],
+        "reported_by": current_user["uid"],
         "assigned_to": None,
     }
     doc_ref.set(doc)
@@ -49,7 +49,7 @@ async def get_incidents(current_user: dict = Depends(get_current_user)):
     if current_user.get("role") == "admin":
         docs = db.collection("incidents").get()
     else:
-        docs = db.collection("incidents").where("reported_by", "==", current_user["user_id"]).get()
+        docs = db.collection("incidents").where("reported_by", "==", current_user["uid"]).get()
     incidents = [{**d.to_dict(), "id": d.id} for d in docs]
     return {"incidents": incidents}
 
