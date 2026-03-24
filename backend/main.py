@@ -5,6 +5,7 @@ from app.routes.auth import router as auth_router
 from app.routes.google_auth import router as google_auth_router
 from app.routes.forgot_password import router as forgot_password_router
 from app.routes.incidents import router as incidents_router
+from app.routes.dashboard import router as dashboard_router
 
 app = FastAPI(title="AlertNest API", version="1.0.0")
 
@@ -28,6 +29,7 @@ app.include_router(auth_router)
 app.include_router(google_auth_router)
 app.include_router(forgot_password_router)
 app.include_router(incidents_router)
+app.include_router(dashboard_router)
 
 @app.get("/api/ping")
 async def ping():
