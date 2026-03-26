@@ -2,251 +2,225 @@ import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { getDashboardSummary, getIncidents, createIncident } from '../services/api';
 import api from '../services/api';
+import Sidebar from '../components/Sidebar';
+import StatCard from '../components/StatCard';
+import ProgressChart from '../components/ProgressChart';
+import ActivityList from '../components/ActivityList';
 
-const NAV = [
-  { label: 'Dashboard', icon: '⊞' },
-  { label: 'Incidents', icon: '⚠' },
-  { label: 'Report', icon: '+' },
-  { label: 'Settings', icon: '⚙' },
-];
+// ── Exact same palette as Login/Signup ──
+const GREEN      = '#008055';
+const GREEN_DARK = '#006644';
+const CREAM      = '#f5f0e8';
+const CREAM_DARK = '#ece8df';
 
-const SEV_DOT = { high: 'bg-red-500', medium: 'bg-yellow-400', low: 'bg-green-500' };
-const STATUS_PILL = {
-  reported: 'bg-blue-100 text-blue-700',
-  in_progress: 'bg-yellow-100 text-yellow-700',
-  resolved: 'bg-green-100 text-green-700',
+const STATUS_COLOR = {
+  reported:    { bg: '#dbeafe', color: '#1d4ed8' },
+  in_progress: { bg: '#fef3c7', color: '#b45309' },
+  resolved:    { bg: '#d1fae5', color: '#065f46' },
 };
+const SEV_DOT = { high: '#ef4444', medium: '#f59e0b', low: '#008055' };
 
-function DonutChart({ pct }) {
-  const r = 40, c = 2 * Math.PI * r;
-  const dash = (pct / 100) * c;
-  return (
-    <svg width="110" height="110" viewBox="0 0 110 110">
-      <circle cx="55" cy="55" r={r} fill="none" stroke="#e5e7eb" strokeWidth="12" />
-      <circle cx="55" cy="55" r={r} fill="none" stroke="#0d9488" strokeWidth="12"
-        strokeDasharray={`${dash} ${c}`} strokeLinecap="round"
-        transform="rotate(-90 55 55)" />
-      <text x="55" y="60" textAnchor="middle" fontSize="16" fontWeight="bold" fill="#0d9488">{pct}%</text>
-    </svg>
-  );
-}
+const inputStyle = {
+  border: '1px solid #ccc5b5', borderRadius: '10px', padding: '10px 14px',
+  fontSize: '13px', background: CREAM, outline: 'none', color: '#333',
+  width: '100%', boxSizing: 'border-box',
+  fontFamily: "'Segoe UI', system-ui, sans-serif",
+};
 
 export default function Dashboard() {
   const { user, logout } = useAuth();
-  const [active, setActive] = useState('Dashboard');
-  const [summary, setSummary] = useState(null);
-  const [recent, setRecent] = useState([]);
-  const [incidents, setIncidents] = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: '', description: '', category: '', location: '' });
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
+  const [active, setActive]           = useState('Dashboard');
+  const [summary, setSummary]         = useState(null);
+  const [recent, setRecent]           = useState([]);
+  const [incidents, setIncidents]     = useState([]);
+  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [form, setForm]               = useState({ title: '', description: '', category: '', location: '' });
+  const [submitting, setSubmitting]   = useState(false);
+  const [error, setError]             = useState('');
 
-  useEffect(() => {
+  const load = () => {
     getDashboardSummary().then(r => setSummary(r.data)).catch(() => {});
-    api.get('/api/dashboard/recent').then(r => setRecent(r.data.incidents)).catch(() => {});
-    getIncidents().then(r => setIncidents(r.data.incidents)).catch(() => {});
-  }, []);
-
-  const reload = () => {
-    getDashboardSummary().then(r => setSummary(r.data)).catch(() => {});
-    api.get('/api/dashboard/recent').then(r => setRecent(r.data.incidents)).catch(() => {});
-    getIncidents().then(r => setIncidents(r.data.incidents)).catch(() => {});
+    api.get('/api/dashboard/recent').then(r => setRecent(r.data.incidents || [])).catch(() => {});
+    getIncidents().then(r => setIncidents(r.data.incidents || [])).catch(() => {});
   };
+  useEffect(() => { load(); }, []);
+
+  const activityItems = recent.map(i => ({
+    dot: i.severity || i.status,
+    text: `${i.title} — ${i.category || 'General'} · ${i.status?.replace('_', ' ')}`,
+  }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitting(true);
-    setError('');
+    setSubmitting(true); setError('');
     try {
       await createIncident(form);
       setForm({ title: '', description: '', category: '', location: '' });
-      setShowForm(false);
-      setActive('Dashboard');
-      reload();
-    } catch { setError('Failed to submit incident'); }
+      setActive('Dashboard'); load();
+    } catch { setError('Failed to submit. Try again.'); }
     finally { setSubmitting(false); }
   };
 
   return (
-    <div className="flex h-screen bg-gray-100 font-sans">
-      {/* Sidebar */}
-      <div className="w-52 bg-teal-700 flex flex-col py-6 px-4 gap-2 shrink-0">
-        <div className="text-white font-bold text-lg mb-6 px-2">AlertNest</div>
-        {NAV.map(n => (
-          <button key={n.label} onClick={() => { setActive(n.label); if (n.label === 'Report') setShowForm(true); }}
-            className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium transition
-              ${active === n.label ? 'bg-white text-teal-700' : 'text-white hover:bg-teal-600'}`}>
-            <span>{n.icon}</span>{n.label}
-          </button>
-        ))}
-        <div className="mt-auto">
-          <button onClick={logout}
-            className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm font-medium text-white hover:bg-teal-600 w-full">
-            <span>⏻</span> Logout
-          </button>
-        </div>
-      </div>
+    <div style={{ display: 'flex', height: '100vh', background: CREAM, fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: 'hidden' }}>
+      <Sidebar active={active} onNav={setActive} onLogout={logout} />
 
-      {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', background: CREAM }}>
+
         {/* Topbar */}
-        <div className="bg-white px-8 py-4 flex items-center justify-between shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-700">{active}</h2>
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-full bg-teal-600 flex items-center justify-center text-white text-sm font-bold">
-              {user?.name?.[0]?.toUpperCase()}
+        <div style={{
+          background: CREAM_DARK, padding: '15px 30px',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          borderBottom: '1px solid #ccc5b5',
+        }}>
+          <span style={{ fontSize: '16px', fontWeight: '600', color: GREEN, letterSpacing: '0.2px' }}>{active}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{
+              width: '36px', height: '36px', borderRadius: '50%', background: GREEN,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: '#fff', fontWeight: '700', fontSize: '14px',
+            }}>
+              {user?.name?.[0]?.toUpperCase() || 'U'}
             </div>
-            <span className="text-sm text-gray-600">{user?.name} · <span className="capitalize">{user?.role}</span></span>
+            <div>
+              <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{user?.name || 'User'}</p>
+              <p style={{ margin: 0, fontSize: '11px', color: '#9c9080', textTransform: 'capitalize' }}>{user?.role || 'student'}</p>
+            </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '26px 30px', background: CREAM }}>
 
-          {/* Report Form */}
-          {(active === 'Report' || showForm) && (
-            <div className="bg-white rounded-2xl shadow p-6 mb-6 max-w-2xl">
-              <h3 className="font-semibold text-teal-700 mb-4">Report New Incident</h3>
-              {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
-              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                <input required placeholder="Title" value={form.title}
-                  onChange={e => setForm({ ...form, title: e.target.value })}
-                  className="border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-teal-400" />
-                <textarea required placeholder="Description (keywords like 'fire', 'leak' auto-set severity)"
-                  value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
-                  className="border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-teal-400 resize-none h-24" />
-                <div className="flex gap-4">
-                  <input required placeholder="Category" value={form.category}
-                    onChange={e => setForm({ ...form, category: e.target.value })}
-                    className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-teal-400" />
-                  <input required placeholder="Location / Block" value={form.location}
-                    onChange={e => setForm({ ...form, location: e.target.value })}
-                    className="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-teal-400" />
+          {/* ── DASHBOARD ── */}
+          {active === 'Dashboard' && (
+            <>
+              <div style={{ display: 'flex', gap: '20px', marginBottom: '22px' }}>
+                <StatCard label="Total Incidents" value={summary?.total}       subtitle="Since last month" icon="📋" />
+                <StatCard label="In Progress"     value={summary?.in_progress} subtitle="Since last month" icon="🔄" trend="down" />
+                <StatCard label="Resolved Cases"  value={summary?.resolved}    subtitle="Since last month" icon="✅" />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+
+                {/* Overview */}
+                <div style={{ background: CREAM_DARK, borderRadius: '16px', padding: '20px 22px', border: '1px solid #ddd8ce', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+                  <p style={{ margin: '0 0 14px', fontSize: '14px', fontWeight: '600', color: '#1a1a1a' }}>Overview</p>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {recent.length === 0 && <p style={{ fontSize: '13px', color: '#9c9080', margin: 0 }}>No incidents yet</p>}
+                    {recent.map((inc, idx) => (
+                      <button key={inc.id} onClick={() => setSelectedIdx(idx)} style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '10px 14px', borderRadius: '10px', border: 'none', cursor: 'pointer',
+                        background: selectedIdx === idx ? GREEN : '#d8d3c8',
+                        color: selectedIdx === idx ? '#fff' : '#3a3020',
+                        textAlign: 'left', width: '100%', transition: 'all 0.15s',
+                      }}>
+                        <div>
+                          <p style={{ margin: 0, fontSize: '12px', fontWeight: '600', lineHeight: 1.4 }}>{inc.title}</p>
+                          <p style={{ margin: '2px 0 0', fontSize: '11px', opacity: 0.7 }}>{inc.category}</p>
+                        </div>
+                        <span style={{ fontSize: '12px', fontWeight: '700', opacity: 0.75 }}>+1</span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex gap-3">
-                  <button type="submit" disabled={submitting}
-                    className="bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold px-6 py-2 rounded-full transition disabled:opacity-50">
-                    {submitting ? 'Submitting...' : 'Submit Incident'}
-                  </button>
-                  <button type="button" onClick={() => { setShowForm(false); setActive('Dashboard'); }}
-                    className="border border-gray-200 text-gray-500 text-sm px-6 py-2 rounded-full hover:bg-gray-50">
-                    Cancel
-                  </button>
+
+                <ProgressChart pct={summary?.resolution_rate ?? 0} onViewAll={() => setActive('Incidents')} />
+                <ActivityList items={activityItems} onViewAll={() => setActive('Incidents')} />
+              </div>
+            </>
+          )}
+
+          {/* ── INCIDENTS ── */}
+          {active === 'Incidents' && (
+            <div style={{ background: CREAM_DARK, borderRadius: '16px', padding: '22px 24px', border: '1px solid #ddd8ce', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+                
+                <span style={{ fontSize: '15px', fontWeight: '600', color: '#1a1a1a' }}>All Incidents</span>
+                <button onClick={() => setActive('Reports')} style={{
+                  background: GREEN, color: '#fff', border: 'none', borderRadius: '20px',
+                  padding: '7px 16px', fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                }}>+ Report</button>
+              </div>
+              {incidents.length === 0
+                ? <p style={{ fontSize: '13px', color: '#9c9080' }}>No incidents found.</p>
+                : incidents.map(i => (
+                  <div key={i.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '13px 18px', borderRadius: '12px', background: CREAM,
+                    marginBottom: '8px', border: '1px solid #ccc5b5',
+                  }}>
+                    <div>
+                      <p style={{ margin: '0 0 3px', fontSize: '13px', fontWeight: '600', color: '#1a1a1a' }}>{i.title}</p>
+                      <p style={{ margin: 0, fontSize: '12px', color: '#9c9080' }}>{i.category} &middot; {i.location}</p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: SEV_DOT[i.severity] || '#ccc5b5' }} />
+                        <span style={{ fontSize: '12px', color: '#7a7060', textTransform: 'capitalize' }}>{i.severity}</span>
+                      </div>
+                      <span style={{
+                        fontSize: '12px', fontWeight: '600', padding: '3px 12px', borderRadius: '20px',
+                        background: STATUS_COLOR[i.status]?.bg || '#ddd8ce',
+                        color: STATUS_COLOR[i.status]?.color || '#7a7060',
+                      }}>
+                        {i.status?.replace('_', ' ')}
+                      </span>
+                    </div>
+                  </div>
+                ))
+              }
+            </div>
+          )}
+
+          {/* ── REPORTS ── */}
+          {active === 'Reports' && (
+            <div style={{ background: CREAM_DARK, borderRadius: '16px', padding: '24px 26px', maxWidth: '540px', border: '1px solid #ddd8ce', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              <h3 style={{ margin: '0 0 20px', fontSize: '16px', fontWeight: '700', color: GREEN }}>Report New Incident</h3>
+              {error && <p style={{ color: '#ef4444', fontSize: '13px', marginBottom: '12px' }}>{error}</p>}
+              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '13px' }}>
+                {['title', 'category', 'location'].map(f => (
+                  <input key={f} required placeholder={f.charAt(0).toUpperCase() + f.slice(1)}
+                    value={form[f]} onChange={e => setForm({ ...form, [f]: e.target.value })}
+                    style={inputStyle} />
+                ))}
+                <textarea required placeholder="Description — 'fire', 'leak', 'broken' auto-sets severity"
+                  value={form.description} onChange={e => setForm({ ...form, description: e.target.value })}
+                  style={{ ...inputStyle, resize: 'none', height: '90px' }} />
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button type="submit" disabled={submitting} style={{
+                    background: GREEN, color: '#fff', border: 'none', borderRadius: '20px',
+                    padding: '10px 24px', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
+                    opacity: submitting ? 0.6 : 1,
+                  }}>{submitting ? 'Submitting...' : 'Submit'}</button>
+                  <button type="button" onClick={() => setActive('Dashboard')} style={{
+                    background: 'transparent', color: '#7a7060', border: '1px solid #ccc5b5',
+                    borderRadius: '20px', padding: '10px 24px', fontSize: '13px', cursor: 'pointer',
+                  }}>Cancel</button>
                 </div>
               </form>
             </div>
           )}
 
-          {/* Dashboard View */}
-          {active === 'Dashboard' && summary && (
-            <>
-              {/* Stat Cards */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                {[
-                  { label: 'Total Incidents', value: summary.total, icon: '📋' },
-                  { label: 'In Progress', value: summary.in_progress, icon: '🔄' },
-                  { label: 'Resolved', value: summary.resolved, icon: '✅' },
-                ].map(s => (
-                  <div key={s.label} className="bg-white rounded-2xl shadow p-5 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-gray-400 mb-1">{s.label}</p>
-                      <p className="text-3xl font-bold text-gray-800">{s.value}</p>
-                    </div>
-                    <span className="text-3xl">{s.icon}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Bottom Row */}
-              <div className="grid grid-cols-3 gap-4">
-                {/* Recent Incidents */}
-                <div className="col-span-1 bg-white rounded-2xl shadow p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-semibold text-gray-700">Recent Incidents</p>
-                    <button onClick={() => setActive('Incidents')}
-                      className="text-xs bg-teal-600 text-white px-3 py-1 rounded-full">View All</button>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {recent.length === 0 && <p className="text-xs text-gray-400">No incidents yet</p>}
-                    {recent.map((i, idx) => (
-                      <div key={i.id} className={`flex items-center justify-between px-3 py-2 rounded-xl text-sm
-                        ${idx === 0 ? 'bg-teal-600 text-white' : 'bg-gray-50 text-gray-700'}`}>
-                        <span className="truncate max-w-32">{i.title}</span>
-                        <span className={`text-xs font-semibold ${idx === 0 ? 'text-teal-100' : 'text-gray-400'}`}>
-                          {i.severity}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Resolution Rate */}
-                <div className="col-span-1 bg-white rounded-2xl shadow p-5 flex flex-col items-center justify-center">
-                  <div className="flex items-center justify-between w-full mb-3">
-                    <p className="text-sm font-semibold text-gray-700">Resolution Rate</p>
-                    <button className="text-xs bg-teal-600 text-white px-3 py-1 rounded-full">Stats</button>
-                  </div>
-                  <DonutChart pct={summary.resolution_rate} />
-                  <p className="text-xs text-gray-400 mt-2">of incidents resolved</p>
-                </div>
-
-                {/* Severity Breakdown */}
-                <div className="col-span-1 bg-white rounded-2xl shadow p-5">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-sm font-semibold text-gray-700">Severity Breakdown</p>
-                    <button className="text-xs bg-teal-600 text-white px-3 py-1 rounded-full">View All</button>
-                  </div>
-                  <div className="flex flex-col gap-3">
-                    {[
-                      { label: 'High Priority', count: summary.high, dot: 'bg-red-500' },
-                      { label: 'Medium Priority', count: summary.medium, dot: 'bg-yellow-400' },
-                      { label: 'Low Priority', count: summary.low, dot: 'bg-green-500' },
-                      { label: 'Reported', count: summary.reported, dot: 'bg-blue-400' },
-                    ].map(s => (
-                      <div key={s.label} className="flex items-center justify-between text-sm text-gray-600">
-                        <div className="flex items-center gap-2">
-                          <span className={`w-2 h-2 rounded-full ${s.dot}`} />
-                          {s.label}
-                        </div>
-                        <span className="font-semibold text-gray-800">+{s.count}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </>
+          {/* ── USERS ── */}
+          {active === 'Users' && (
+            <div style={{ background: CREAM_DARK, borderRadius: '16px', padding: '24px 26px', maxWidth: '500px', border: '1px solid #ddd8ce', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              <p style={{ fontSize: '15px', fontWeight: '600', color: '#1a1a1a', margin: '0 0 8px' }}>Users</p>
+              <p style={{ fontSize: '13px', color: '#9c9080', margin: 0 }}>User management coming soon.</p>
+            </div>
           )}
 
-          {/* Incidents List View */}
-          {active === 'Incidents' && (
-            <div className="bg-white rounded-2xl shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-700">All Incidents</h3>
-                <button onClick={() => { setActive('Report'); setShowForm(true); }}
-                  className="bg-teal-600 text-white text-xs font-bold px-4 py-2 rounded-full">+ Report</button>
-              </div>
-              {incidents.length === 0
-                ? <p className="text-sm text-gray-400">No incidents found.</p>
-                : <div className="flex flex-col gap-3">
-                  {incidents.map(i => (
-                    <div key={i.id} className="flex items-center justify-between border border-gray-100 rounded-xl px-5 py-3">
-                      <div>
-                        <p className="font-medium text-gray-800 text-sm">{i.title}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{i.category} · {i.location}</p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1">
-                          <span className={`w-2 h-2 rounded-full ${SEV_DOT[i.severity]}`} />
-                          <span className="text-xs text-gray-500 capitalize">{i.severity}</span>
-                        </div>
-                        <span className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_PILL[i.status]}`}>
-                          {i.status.replace('_', ' ')}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+          {/* ── SETTINGS ── */}
+          {active === 'Settings' && (
+            <div style={{ background: CREAM_DARK, borderRadius: '16px', padding: '24px 26px', maxWidth: '420px', border: '1px solid #ddd8ce', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+              <p style={{ fontSize: '15px', fontWeight: '600', color: '#1a1a1a', margin: '0 0 18px' }}>Settings</p>
+              {[{ label: 'Name', value: user?.name }, { label: 'Email', value: user?.email }, { label: 'Role', value: user?.role }].map(f => (
+                <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #ccc5b5' }}>
+                  <span style={{ fontSize: '13px', color: '#9c9080' }}>{f.label}</span>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a1a', textTransform: 'capitalize' }}>{f.value || '—'}</span>
                 </div>
-              }
+              ))}
             </div>
           )}
 

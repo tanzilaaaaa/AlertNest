@@ -3,11 +3,17 @@ import { useAuth } from '../context/AuthContext';
 import SocialButtons from '../components/SocialButtons';
 import ForgotPassword from '../components/ForgotPassword';
 
+const GREEN = '#008055';
+const GREEN_DARK = '#006644';
+const CREAM = '#f5f0e8';
+const CREAM_DARK = '#ece8df';
+
 export default function Login({ onSwitch }) {
   const { login } = useAuth();
   const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
   const [showForgot, setShowForgot] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -20,54 +26,95 @@ export default function Login({ onSwitch }) {
   };
 
   return (
-    <div className="min-h-screen bg-teal-900 flex items-center justify-center p-6">
+    <div style={{ minHeight: '100vh', background: CREAM, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px', fontFamily: "'Segoe UI', sans-serif" }}>
       {showForgot && <ForgotPassword onClose={() => setShowForgot(false)} />}
-      <div className="flex w-full max-w-3xl rounded-2xl overflow-hidden shadow-2xl">
-        {/* Left Panel */}
-        <div className="relative w-2/5 bg-teal-600 flex flex-col items-start justify-center p-8 overflow-hidden">
-          <div className="absolute w-56 h-56 bg-teal-500 rounded-3xl rotate-45 -top-10 -left-10 opacity-70" />
-          <div className="absolute w-48 h-48 bg-teal-700 rounded-3xl rotate-45 top-16 -left-16 opacity-60" />
-          <div className="absolute w-40 h-40 bg-teal-400 rounded-3xl rotate-45 bottom-0 left-8 opacity-50" />
-          <div className="relative z-10 flex flex-col gap-4 mt-auto mb-auto">
-            <button className="bg-white text-teal-800 font-bold px-6 py-2 rounded-full text-sm shadow">LOGIN</button>
-            <button onClick={onSwitch} className="text-white font-semibold text-sm px-2 opacity-80 hover:opacity-100">SIGN UP</button>
+
+      <div style={{ display: 'flex', width: '100%', maxWidth: '780px', borderRadius: '20px', overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.12)' }}>
+
+        {/* Left green panel */}
+        <div style={{ width: '40%', background: GREEN, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 28px', position: 'relative', overflow: 'hidden' }}>
+          {/* decorative blobs */}
+          <div style={{ position: 'absolute', width: '180px', height: '180px', background: GREEN_DARK, borderRadius: '30px', transform: 'rotate(45deg)', top: '-50px', left: '-50px', opacity: 0.6 }} />
+          <div style={{ position: 'absolute', width: '140px', height: '140px', background: '#3a9e65', borderRadius: '24px', transform: 'rotate(45deg)', bottom: '-30px', right: '-40px', opacity: 0.5 }} />
+
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center' }}>
+            <div style={{ fontSize: '28px', marginBottom: '8px' }}>🌿</div>
+            <p style={{ color: '#a7f3d0', fontSize: '12px', textAlign: 'center', margin: '0 0 16px' }}>Welcome back to AlertNest</p>
+            <button style={{
+              background: CREAM, color: GREEN, border: 'none', borderRadius: '20px',
+              padding: '8px 28px', fontWeight: '700', fontSize: '13px', cursor: 'default'
+            }}>LOGIN</button>
+            <button onClick={onSwitch} style={{
+              background: 'transparent', color: '#d1fae5', border: 'none',
+              fontSize: '13px', fontWeight: '500', cursor: 'pointer', opacity: 0.85
+            }}>SIGN UP →</button>
           </div>
         </div>
-        {/* Right Panel */}
-        <div className="w-3/5 bg-white flex flex-col items-center justify-center px-10 py-10">
-          <div className="bg-teal-600 rounded-full p-4 mb-3">
-            <svg viewBox="0 0 24 24" fill="white" width="36" height="36">
+
+        {/* Right cream panel */}
+        <div style={{ width: '60%', background: CREAM_DARK, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '44px 40px' }}>
+          <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: GREEN, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
+            <svg viewBox="0 0 24 24" fill="white" width="26" height="26">
               <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
             </svg>
           </div>
-          <h2 className="text-2xl font-bold text-teal-700 mb-6">LOGIN</h2>
-          {error && <p className="text-red-500 text-sm mb-3">{error}</p>}
-          <form onSubmit={handleSubmit} className="w-full flex flex-col gap-5">
-            <div className="flex items-center border-b border-gray-300 pb-1">
-              <svg className="mr-2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+          <h2 style={{ margin: '0 0 24px', fontSize: '22px', fontWeight: '700', color: GREEN }}>LOGIN</h2>
+
+          {error && <p style={{ color: '#ef4444', fontSize: '12px', marginBottom: '12px', background: '#fef2f2', padding: '8px 12px', borderRadius: '8px', width: '100%', textAlign: 'center' }}>{error}</p>}
+
+          <form onSubmit={handleSubmit} style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '18px' }}>
+            {/* Email */}
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: `1px solid #ccc5b5`, paddingBottom: '6px' }}>
+              <svg style={{ marginRight: '8px', flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2" width="16" height="16">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
               </svg>
               <input type="email" placeholder="Email" value={form.email}
                 onChange={e => setForm({ ...form, email: e.target.value })} required
-                className="flex-1 outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent" />
+                style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', color: '#333', background: 'transparent', placeholder: '#aaa' }} />
             </div>
-            <div className="flex items-center border-b border-gray-300 pb-1">
-              <svg className="mr-2 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18">
+
+            {/* Password */}
+            <div style={{ display: 'flex', alignItems: 'center', borderBottom: `1px solid #ccc5b5`, paddingBottom: '6px' }}>
+              <svg style={{ marginRight: '8px', flexShrink: 0 }} viewBox="0 0 24 24" fill="none" stroke="#aaa" strokeWidth="2" width="16" height="16">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
               </svg>
-              <input type="password" placeholder="Password" value={form.password}
+              <input type={showPassword ? 'text' : 'password'} placeholder="Password" value={form.password}
                 onChange={e => setForm({ ...form, password: e.target.value })} required
-                className="flex-1 outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent" />
+                style={{ flex: 1, border: 'none', outline: 'none', fontSize: '13px', color: '#333', background: 'transparent' }} />
+              <button type="button" onClick={() => setShowPassword(p => !p)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '0 2px', color: '#aaa', display: 'flex', alignItems: 'center' }}>
+                {showPassword ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
+                    <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                    <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                )}
+              </button>
             </div>
-            <div className="flex items-center justify-between mt-1">
-              <span onClick={() => setShowForgot(true)} className="text-teal-600 text-xs cursor-pointer hover:underline">Forgot Password?</span>
-              <button type="submit" className="bg-teal-600 hover:bg-teal-700 text-white text-sm font-bold px-6 py-2 rounded-full transition">LOGIN</button>
+
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span onClick={() => setShowForgot(true)}
+                style={{ fontSize: '12px', color: GREEN, cursor: 'pointer', textDecoration: 'underline' }}>
+                Forgot Password?
+              </span>
+              <button type="submit" style={{
+                background: GREEN, color: '#fff', border: 'none', borderRadius: '20px',
+                padding: '9px 28px', fontSize: '13px', fontWeight: '700', cursor: 'pointer'
+              }}>LOGIN</button>
             </div>
           </form>
+
           <SocialButtons onError={setError} label="Login" />
-          <p className="text-xs text-gray-400 mt-4">
+
+          <p style={{ fontSize: '12px', color: '#999', marginTop: '16px' }}>
             Don't have an account?{' '}
-            <button onClick={onSwitch} className="text-teal-600 font-semibold hover:underline">Sign Up</button>
+            <button onClick={onSwitch} style={{ background: 'none', border: 'none', color: GREEN, fontWeight: '700', cursor: 'pointer', fontSize: '12px' }}>Sign Up</button>
           </p>
         </div>
       </div>
