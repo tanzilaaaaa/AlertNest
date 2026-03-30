@@ -24,8 +24,8 @@ export const getMe = () => api.get('/api/auth/me');
 export const getIncidents = () => api.get('/api/incidents');
 export const getIncident = (id) => api.get(`/api/incidents/${id}`);
 export const createIncident = (data) => api.post('/api/incidents', data);
-export const assignIncident = (id, data) => api.put(`/api/incidents/${id}/assign`, data);
 export const updateStatus = (id, data) => api.put(`/api/incidents/${id}/status`, data);
+export const assignIncident = (id, data) => api.put(`/api/incidents/${id}/assign`, data);
 
 export const getDashboardSummary = () => api.get('/api/dashboard/summary');
 export const getDashboardAnalytics = () => api.get('/api/dashboard/analytics');
