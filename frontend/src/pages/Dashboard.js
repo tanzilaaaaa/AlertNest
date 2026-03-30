@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { getDashboardSummary, getIncidents, createIncident, updateStatus, assignIncident } from '../services/api';
+import { getDashboardSummary, getIncidents, createIncident, updateStatus, assignIncident, deleteIncident, getUsers, updateUserRole, deleteUser } from '../services/api';
 import api from '../services/api';
 import Sidebar from '../components/Sidebar';
 import StatCard from '../components/StatCard';
 import ProgressChart from '../components/ProgressChart';
 import ActivityList from '../components/ActivityList';
-import { FaCrown, FaTools, FaGraduationCap, FaClipboardList, FaSync, FaCheckCircle } from 'react-icons/fa';
+import { FaCrown, FaTools, FaGraduationCap, FaClipboardList, FaSync, FaCheckCircle, FaTrash } from 'react-icons/fa';
 
 const GREEN      = '#c8873a';   // gold accent
 const CREAM      = '#0d2b1f';   // dark card bg
@@ -67,11 +67,14 @@ export default function Dashboard() {
   const [error, setError]             = useState('');
   const [assignInput, setAssignInput] = useState({});
   const [actionMsg, setActionMsg]     = useState('');
+  const [users, setUsers]             = useState([]);
+  const [roleInput, setRoleInput]     = useState({});
 
   const load = () => {
     getDashboardSummary().then(r => setSummary(r.data)).catch(() => {});
     api.get('/api/dashboard/recent').then(r => setRecent(r.data.incidents || [])).catch(() => {});
     getIncidents().then(r => setIncidents(r.data.incidents || [])).catch(() => {});
+    if (role === 'admin') getUsers().then(r => setUsers(r.data.users || [])).catch(() => {});
   };
   useEffect(() => { load(); }, []);
 
@@ -110,6 +113,38 @@ export default function Dashboard() {
       setTimeout(() => setActionMsg(''), 2000);
       load();
     } catch { setActionMsg('Failed to assign'); setTimeout(() => setActionMsg(''), 2000); }
+  };
+
+  const handleDeleteIncident = async (id) => {
+    if (!window.confirm('Delete this incident?')) return;
+    try {
+      await deleteIncident(id);
+      setActionMsg('Incident deleted');
+      setTimeout(() => setActionMsg(''), 2000);
+      load();
+    } catch { setActionMsg('Failed to delete'); setTimeout(() => setActionMsg(''), 2000); }
+  };
+
+  const handleUpdateRole = async (userId) => {
+    const newRole = roleInput[userId];
+    if (!newRole) return;
+    try {
+      await updateUserRole(userId, newRole);
+      setRoleInput(p => ({ ...p, [userId]: '' }));
+      setActionMsg('Role updated');
+      setTimeout(() => setActionMsg(''), 2000);
+      load();
+    } catch { setActionMsg('Failed to update role'); setTimeout(() => setActionMsg(''), 2000); }
+  };
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('Delete this user?')) return;
+    try {
+      await deleteUser(userId);
+      setActionMsg('User deleted');
+      setTimeout(() => setActionMsg(''), 2000);
+      load();
+    } catch { setActionMsg('Failed to delete user'); setTimeout(() => setActionMsg(''), 2000); }
   };
 
   // Nav items differ by role
@@ -298,6 +333,19 @@ export default function Dashboard() {
                         Assigned to: <strong>{i.assigned_to}</strong>
                       </p>
                     )}
+
+                    {/* Delete — admin always, student only on their own reported */}
+                    {(role === 'admin' || (role === 'student' && i.reported_by === user?.id && i.status === 'reported')) && (
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '8px' }}>
+                        <button onClick={() => handleDeleteIncident(i.id)} style={{
+                          background: 'rgba(248,113,113,0.12)', color: '#f87171',
+                          border: '1px solid rgba(248,113,113,0.3)', borderRadius: '6px',
+                          padding: '4px 10px', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px',
+                        }}>
+                          <FaTrash size={10} /> Delete
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               }
@@ -333,22 +381,74 @@ export default function Dashboard() {
 
           {/* ── USERS (admin only) ── */}
           {active === 'Users' && role === 'admin' && (
-            <div style={{ background: '#112d20', borderRadius: '16px', padding: '24px 26px', maxWidth: '500px', border: '1px solid #1e4030', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
-              <p style={{ fontSize: '15px', fontWeight: '600', color: '#e8e0d0', margin: '0 0 8px' }}>Users</p>
-              <p style={{ fontSize: '13px', color: '#7a9e8a', margin: 0 }}>User management coming soon.</p>
+            <div style={{ background: '#112d20', borderRadius: '16px', padding: '24px 26px', border: '1px solid #1e4030' }}>
+              <p style={{ fontSize: '15px', fontWeight: '600', color: '#e8e0d0', margin: '0 0 18px' }}>User Management</p>
+              {users.length === 0
+                ? <p style={{ fontSize: '13px', color: '#7a9e8a' }}>No users found.</p>
+                : users.map(u => (
+                  <div key={u.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 16px', borderRadius: '10px', background: '#0d2b1f',
+                    marginBottom: '10px', border: '1px solid #1e4030', flexWrap: 'wrap', gap: '10px',
+                  }}>
+                    <div>
+                      <p style={{ margin: 0, fontSize: '13px', fontWeight: '600', color: '#e8e0d0' }}>{u.name || '—'}</p>
+                      <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#7a9e8a' }}>{u.email}</p>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{
+                        fontSize: '11px', fontWeight: '600', padding: '3px 10px', borderRadius: '20px',
+                        background: ROLE_BADGE[u.role]?.bg || '#ddd', color: ROLE_BADGE[u.role]?.color || '#333',
+                        textTransform: 'capitalize',
+                      }}>{u.role}</span>
+                      <select
+                        value={roleInput[u.id] || ''}
+                        onChange={e => setRoleInput(p => ({ ...p, [u.id]: e.target.value }))}
+                        style={{ border: '1px solid #1e4030', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', background: '#0a2218', color: '#e8e0d0', outline: 'none' }}
+                      >
+                        <option value="">Change role</option>
+                        <option value="student">Student</option>
+                        <option value="staff">Staff</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                      <button onClick={() => handleUpdateRole(u.id)} style={{ ...btnGold, padding: '4px 12px', fontSize: '11px' }}>Save</button>
+                      <button onClick={() => handleDeleteUser(u.id)} style={{
+                        background: 'rgba(248,113,113,0.15)', color: '#f87171', border: '1px solid rgba(248,113,113,0.3)',
+                        borderRadius: '6px', padding: '4px 10px', fontSize: '11px', cursor: 'pointer',
+                      }}>
+                        <FaTrash size={11} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              }
             </div>
           )}
 
           {/* ── SETTINGS ── */}
           {active === 'Settings' && (
-            <div style={{ background: '#112d20', borderRadius: '16px', padding: '24px 26px', maxWidth: '420px', border: '1px solid #1e4030', boxShadow: '0 1px 4px rgba(0,0,0,0.05)' }}>
+            <div style={{ background: '#112d20', borderRadius: '16px', padding: '24px 26px', maxWidth: '420px', border: '1px solid #1e4030' }}>
               <p style={{ fontSize: '15px', fontWeight: '600', color: '#e8e0d0', margin: '0 0 18px' }}>Settings</p>
-              {[{ label: 'Name', value: user?.name }, { label: 'Email', value: user?.email }, { label: 'Role', value: user?.role }].map(f => (
+              {[
+                { label: 'Name',  value: user?.name  || '—' },
+                { label: 'Email', value: user?.email || '—' },
+                { label: 'Role',  value: user?.role  || '—' },
+              ].map(f => (
                 <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: '1px solid #1e4030' }}>
                   <span style={{ fontSize: '13px', color: '#7a9e8a' }}>{f.label}</span>
-                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#e8e0d0', textTransform: 'capitalize' }}>{f.value || '—'}</span>
+                  <span style={{ fontSize: '13px', fontWeight: '600', color: '#e8e0d0', textTransform: f.label === 'Role' ? 'capitalize' : 'none' }}>{f.value}</span>
                 </div>
               ))}
+              <button
+                onClick={logout}
+                style={{
+                  marginTop: '24px', width: '100%', background: 'rgba(248,113,113,0.12)',
+                  color: '#f87171', border: '1px solid rgba(248,113,113,0.3)', borderRadius: '8px',
+                  padding: '11px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', letterSpacing: '0.3px',
+                }}
+              >
+                Log Out
+              </button>
             </div>
           )}
 
