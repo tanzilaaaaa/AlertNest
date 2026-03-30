@@ -1,43 +1,39 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-import httpx
 from app.database import get_db
-from app.utils.auth import create_token
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
-class GoogleAccessToken(BaseModel):
-    access_token: str
+class GoogleSyncData(BaseModel):
+    uid: str
+    email: str
+    name: str | None = None
+    role: str = "student"
 
-@router.post("/google")
-async def google_login(body: GoogleAccessToken):
-    async with httpx.AsyncClient() as client:
-        resp = await client.get(
-            "https://www.googleapis.com/oauth2/v3/userinfo",
-            headers={"Authorization": f"Bearer {body.access_token}"}
-        )
-    if resp.status_code != 200:
-        raise HTTPException(status_code=401, detail="Invalid Google token")
-
-    info = resp.json()
-    email = info.get("email")
-    name = info.get("name", email)
-    if not email:
-        raise HTTPException(status_code=400, detail="Could not get email from Google")
-
+@router.post("/google-sync")
+async def google_sync(body: GoogleSyncData):
+    """
+    Called after Firebase Google sign-in on the frontend.
+    Creates the user doc in Firestore if it doesn't exist.
+    """
     db = get_db()
-    users_ref = db.collection("users")
-    existing = users_ref.where("email", "==", email).get()
+    user_ref = db.collection("users").document(body.uid)
+    doc = user_ref.get()
 
-    if existing:
-        user_doc = existing[0]
-        user_id = user_doc.id
-        role = user_doc.to_dict().get("role", "student")
-    else:
-        doc_ref = users_ref.document()
-        doc_ref.set({"name": name, "email": email, "password": None, "role": "student", "provider": "google"})
-        user_id = doc_ref.id
-        role = "student"
+    if not doc.exists:
+        user_ref.set({
+            "name": body.name or body.email,
+            "email": body.email,
+            "role": body.role,
+            "provider": "google"
+        })
 
-    token = create_token({"user_id": user_id, "role": role})
-    return {"token": token, "user": {"id": user_id, "name": name, "email": email, "role": role}}
+    user = user_ref.get().to_dict()
+    return {
+        "user": {
+            "id": body.uid,
+            "name": user.get("name"),
+            "email": user.get("email"),
+            "role": user.get("role", "student")
+        }
+    }

@@ -84,9 +84,14 @@ async def assign_incident(incident_id: str, data: AssignUpdate, current_user: di
     if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admins only")
     db = get_db()
-    db.collection("incidents").document(incident_id).update(
-        {"assigned_to": data.assigned_to, "status": "in_progress"}
-    )
+    doc = db.collection("incidents").document(incident_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    db.collection("incidents").document(incident_id).update({
+        "assigned_to": data.assigned_to,
+        "status": "in_progress",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
     return {"message": "Incident assigned"}
 
 @router.put("/{incident_id}/status")
@@ -97,7 +102,6 @@ async def update_status(incident_id: str, data: StatusUpdate, current_user: dict
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Incident not found")
     incident = doc.to_dict()
-    # admin can update any, staff can update only assigned to them
     if role == "admin":
         pass
     elif role == "staff" and incident.get("assigned_to") == current_user["uid"]:
@@ -106,5 +110,26 @@ async def update_status(incident_id: str, data: StatusUpdate, current_user: dict
         raise HTTPException(status_code=403, detail="Not authorized to update this incident")
     if data.status not in ["reported", "in_progress", "resolved"]:
         raise HTTPException(status_code=400, detail="Invalid status")
-    db.collection("incidents").document(incident_id).update({"status": data.status})
+    db.collection("incidents").document(incident_id).update({
+        "status": data.status,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    })
     return {"message": "Status updated"}
+
+@router.delete("/{incident_id}")
+async def delete_incident(incident_id: str, current_user: dict = Depends(get_current_user)):
+    role = current_user.get("role", "student")
+    db = get_db()
+    doc = db.collection("incidents").document(incident_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="Incident not found")
+    incident = doc.to_dict()
+    # admin can delete any; student can delete their own unreported ones
+    if role == "admin":
+        pass
+    elif role == "student" and incident.get("reported_by") == current_user["uid"] and incident.get("status") == "reported":
+        pass
+    else:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this incident")
+    db.collection("incidents").document(incident_id).delete()
+    return {"message": "Incident deleted"}
