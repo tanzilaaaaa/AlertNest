@@ -484,15 +484,17 @@ export default function Dashboard() {
 
           {/* ── SETTINGS ── */}
           {active === 'Settings' && (
-            <div style={{ background: '#112d20', borderRadius: '16px', padding: '24px 26px', maxWidth: '420px', border: `1px solid ${BORDER}` }}>
-              <p style={{ fontSize: '15px', fontWeight: '600', color: TEXT, margin: '0 0 18px' }}>Settings</p>
-              {[{ label: 'Name', value: user?.name || '—' }, { label: 'Email', value: user?.email || '—' }, { label: 'Role', value: user?.role || '—' }].map(f => (
-                <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: `1px solid ${BORDER}` }}>
-                  <span style={{ fontSize: '13px', color: '#7a9e8a' }}>{f.label}</span>
-                  <span style={{ fontSize: '13px', fontWeight: '600', color: TEXT, textTransform: f.label === 'Role' ? 'capitalize' : 'none' }}>{f.value}</span>
-                </div>
-              ))}
-              <button onClick={logout} style={{ marginTop: '24px', width: '100%', background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.3)', borderRadius: '8px', padding: '11px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
+            <div style={{ maxWidth: '420px' }}>
+              <div style={{ background: '#112d20', borderRadius: '16px', padding: '24px 26px', border: `1px solid ${BORDER}` }}>
+                <p style={{ fontSize: '15px', fontWeight: '600', color: TEXT, margin: '0 0 18px' }}>Settings</p>
+                {[{ label: 'Name', value: user?.name || '—' }, { label: 'Email', value: user?.email || '—' }, { label: 'Role', value: user?.role || '—' }].map(f => (
+                  <div key={f.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderBottom: `1px solid ${BORDER}` }}>
+                    <span style={{ fontSize: '13px', color: '#7a9e8a' }}>{f.label}</span>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: TEXT, textTransform: f.label === 'Role' ? 'capitalize' : 'none' }}>{f.value}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={logout} style={{ marginTop: '16px', width: '100%', background: 'rgba(248,113,113,0.12)', color: '#f87171', border: '1px solid rgba(248,113,113,0.3)', borderRadius: '8px', padding: '11px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>
                 Log Out
               </button>
             </div>

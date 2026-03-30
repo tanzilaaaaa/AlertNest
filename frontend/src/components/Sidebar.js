@@ -1,4 +1,4 @@
-import { FaThLarge, FaExclamationTriangle, FaFileAlt, FaUsers, FaCog, FaPowerOff, FaLeaf, FaHeadset } from 'react-icons/fa';
+import { FaThLarge, FaExclamationTriangle, FaFileAlt, FaUsers, FaCog, FaLeaf, FaHeadset } from 'react-icons/fa';
 
 const ALL_NAV = [
   { label: 'Dashboard', icon: FaThLarge },
@@ -28,8 +28,6 @@ export default function Sidebar({ active, onNav, onLogout, navItems }) {
         .sb-active { background:${CONTENT}; color:${GOLD}; font-weight:600; }
         .sb-active::before { content:''; position:absolute; right:0; bottom:100%; width:20px; height:20px; background:${SIDEBAR}; border-bottom-right-radius:16px; box-shadow:5px 5px 0 5px ${CONTENT}; pointer-events:none; z-index:2; }
         .sb-active::after  { content:''; position:absolute; right:0; top:100%;    width:20px; height:20px; background:${SIDEBAR}; border-top-right-radius:16px;    box-shadow:5px -5px 0 5px ${CONTENT}; pointer-events:none; z-index:2; }
-        .sb-quit { display:flex; align-items:center; gap:10px; padding:11px 20px; border:none; cursor:pointer; font-size:13px; color:${MUTED}; background:transparent; text-align:left; width:100%; margin-bottom:12px; box-sizing:border-box; }
-        .sb-quit:hover { color:#e8e0d0; }
         .sb-support { background:#0a2218; border-radius:12px; padding:14px 12px; text-align:center; margin:0 14px; border:1px solid #1e4030; }
       `}</style>
 
@@ -51,10 +49,6 @@ export default function Sidebar({ active, onNav, onLogout, navItems }) {
             );
           })}
         </div>
-
-        <button className="sb-quit" onClick={onLogout}>
-          <FaPowerOff size={14} /> Logout
-        </button>
 
         <div className="sb-support">
           <div style={{ fontSize: '26px', lineHeight: 1 }}><FaHeadset size={24} style={{ color: GOLD }} /></div>
