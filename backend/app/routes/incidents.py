@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel
+from fastapi import APIRouter, HTTPException, Depends, Query
+from pydantic import BaseModel, Field
 from app.database import get_db
 from app.utils.auth import get_current_user
 from datetime import datetime, timezone
@@ -7,10 +7,10 @@ from datetime import datetime, timezone
 router = APIRouter(prefix="/api/incidents", tags=["incidents"])
 
 class IncidentCreate(BaseModel):
-    title: str
-    description: str
-    category: str
-    location: str
+    title: str       = Field(..., min_length=3, max_length=120)
+    description: str = Field(..., min_length=10, max_length=2000)
+    category: str    = Field(..., min_length=2, max_length=60)
+    location: str    = Field(..., min_length=2, max_length=120)
 
 class StatusUpdate(BaseModel):
     status: str
@@ -46,15 +46,20 @@ async def create_incident(data: IncidentCreate, current_user: dict = Depends(get
     return {"message": "Incident reported", "incident": doc}
 
 @router.get("")
-async def get_incidents(current_user: dict = Depends(get_current_user)):
+async def get_incidents(
+    current_user: dict = Depends(get_current_user),
+    status:   str = Query(None),
+    severity: str = Query(None),
+    category: str = Query(None),
+):
     db = get_db()
     role = current_user.get("role", "student")
     uid = current_user["uid"]
+
     if role == "admin":
         docs = db.collection("incidents").get()
     elif role == "staff":
-        # staff sees their own + incidents assigned to them
-        own = db.collection("incidents").where("reported_by", "==", uid).get()
+        own      = db.collection("incidents").where("reported_by", "==", uid).get()
         assigned = db.collection("incidents").where("assigned_to", "==", uid).get()
         seen = set()
         incidents = []
@@ -62,10 +67,18 @@ async def get_incidents(current_user: dict = Depends(get_current_user)):
             if d.id not in seen:
                 seen.add(d.id)
                 incidents.append({**d.to_dict(), "id": d.id})
+        # apply filters
+        if status:   incidents = [i for i in incidents if i.get("status")   == status]
+        if severity: incidents = [i for i in incidents if i.get("severity") == severity]
+        if category: incidents = [i for i in incidents if i.get("category", "").lower() == category.lower()]
         return {"incidents": incidents}
     else:
         docs = db.collection("incidents").where("reported_by", "==", uid).get()
+
     incidents = [{**d.to_dict(), "id": d.id} for d in docs]
+    if status:   incidents = [i for i in incidents if i.get("status")   == status]
+    if severity: incidents = [i for i in incidents if i.get("severity") == severity]
+    if category: incidents = [i for i in incidents if i.get("category", "").lower() == category.lower()]
     return {"incidents": incidents}
 
 @router.get("/{incident_id}")
@@ -75,7 +88,8 @@ async def get_incident(incident_id: str, current_user: dict = Depends(get_curren
     if not doc.exists:
         raise HTTPException(status_code=404, detail="Incident not found")
     incident = {**doc.to_dict(), "id": doc.id}
-    if current_user.get("role") != "admin" and incident["reported_by"] != current_user["user_id"]:
+    role = current_user.get("role", "student")
+    if role != "admin" and incident["reported_by"] != current_user["uid"]:
         raise HTTPException(status_code=403, detail="Unauthorized")
     return {"incident": incident}
 

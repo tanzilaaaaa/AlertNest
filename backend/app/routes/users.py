@@ -24,6 +24,16 @@ async def list_users(current_user: dict = Depends(get_current_user)):
         ]
     }
 
+@router.get("/{user_id}")
+async def get_user(user_id: str, current_user: dict = Depends(get_current_user)):
+    _require_admin(current_user)
+    db = get_db()
+    doc = db.collection("users").document(user_id).get()
+    if not doc.exists:
+        raise HTTPException(status_code=404, detail="User not found")
+    user = doc.to_dict()
+    return {"user": {"id": doc.id, **{k: v for k, v in user.items() if k != "password"}}}
+
 @router.put("/{user_id}/role")
 async def update_role(user_id: str, data: RoleUpdate, current_user: dict = Depends(get_current_user)):
     _require_admin(current_user)

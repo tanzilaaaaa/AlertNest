@@ -24,6 +24,16 @@ async def sync_user(data: SyncData = SyncData(), current_user: dict = Depends(ge
             "role": data.role or "student",
             "provider": current_user.get("firebase", {}).get("sign_in_provider", "password")
         })
+    else:
+        # Update name if provided and changed
+        updates = {}
+        existing = doc.to_dict()
+        if data.name and data.name != existing.get("name"):
+            updates["name"] = data.name
+        if data.role and data.role != existing.get("role"):
+            updates["role"] = data.role
+        if updates:
+            user_ref.update(updates)
 
     user = user_ref.get().to_dict()
     return {

@@ -58,21 +58,23 @@ async def get_recent(current_user: dict = Depends(get_current_user)):
     uid  = current_user["uid"]
 
     if role == "admin":
-        docs = db.collection("incidents").limit(5).get()
+        docs = db.collection("incidents").order_by("created_at", direction="DESCENDING").limit(5).get()
         incidents = [d for d in docs]
 
     elif role == "staff":
         own      = db.collection("incidents").where("reported_by", "==", uid).get()
         assigned = db.collection("incidents").where("assigned_to", "==", uid).get()
-        seen, incidents = set(), []
+        seen, all_docs = set(), []
         for d in list(own) + list(assigned):
             if d.id not in seen:
                 seen.add(d.id)
-                incidents.append(d)
-        incidents = incidents[:5]
+                all_docs.append(d)
+        # sort by created_at descending, take 5
+        all_docs.sort(key=lambda d: d.to_dict().get("created_at", ""), reverse=True)
+        incidents = all_docs[:5]
 
     else:
-        docs = db.collection("incidents").where("reported_by", "==", uid).limit(5).get()
+        docs = db.collection("incidents").where("reported_by", "==", uid).order_by("created_at", direction="DESCENDING").limit(5).get()
         incidents = [d for d in docs]
 
     return {
