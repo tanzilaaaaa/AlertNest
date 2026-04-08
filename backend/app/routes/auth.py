@@ -17,12 +17,19 @@ async def sync_user(data: SyncData = SyncData(), current_user: dict = Depends(ge
     user_ref = db.collection("users").document(uid)
     doc = user_ref.get()
 
+    # Determine provider from Firebase token
+    # If 'firebase' key exists with 'sign_in_provider', use that
+    # Otherwise default to 'email' (for email/password auth)
+    provider = "email"  # default for email/password
+    if "firebase" in current_user and "sign_in_provider" in current_user.get("firebase", {}):
+        provider = current_user["firebase"]["sign_in_provider"]
+
     if not doc.exists:
         user_ref.set({
             "name": data.name or current_user.get("name", current_user.get("email", "")),
             "email": current_user.get("email", ""),
             "role": data.role or "student",
-            "provider": current_user.get("firebase", {}).get("sign_in_provider", "password")
+            "provider": provider
         })
     else:
         # Update name if provided and changed
