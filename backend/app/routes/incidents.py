@@ -10,12 +10,7 @@ import base64
 
 router = APIRouter(prefix="/api/incidents", tags=["incidents"])
 
-class IncidentCreate(BaseModel):
-    title: str       = Field(..., max_length=120)
-    description: str = Field(..., max_length=2000)
-    category: str    = Field(..., max_length=60)
-    location: str    = Field(..., max_length=120)
-
+# ── Pydantic models ──────────────────────────────────────────────────────────
 class StatusUpdate(BaseModel):
     status: str
 
@@ -33,6 +28,16 @@ class SavedFilterCreate(BaseModel):
     name: str
     filters: dict
 
+# ── RBAC helpers ─────────────────────────────────────────────────────────────
+def require_admin(current_user: dict):
+    if current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admins only")
+
+def require_admin_or_staff(current_user: dict):
+    if current_user.get("role") not in ("admin", "staff"):
+        raise HTTPException(status_code=403, detail="Admins and staff only")
+
+# ── Severity classifier ──────────────────────────────────────────────────────
 def classify_severity(description: str) -> str:
     desc = description.lower()
     high_keywords = [
@@ -54,6 +59,12 @@ def classify_severity(description: str) -> str:
         return 'medium'
     return 'low'
 
+# ════════════════════════════════════════════════════════════════════════════
+# STATIC ROUTES (must come before /{incident_id})
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── Create incident ──────────────────────────────────────────────────────────
+# WHO: student, staff, admin (all authenticated users can report)
 @router.post("", status_code=201)
 async def create_incident(
     title: str = Form(...),
@@ -64,13 +75,9 @@ async def create_incident(
     current_user: dict = Depends(get_current_user)
 ):
     db = get_db()
-    incidents_collection = db.incidents
-
-    # Process uploaded media files (store as base64 for demo; use cloud storage in production)
     media_files = []
     for f in media:
         content = await f.read()
-        # Limit file size to 10MB
         if len(content) > 10 * 1024 * 1024:
             raise HTTPException(status_code=400, detail=f"File {f.filename} exceeds 10MB limit")
         encoded = base64.b64encode(content).decode('utf-8')
@@ -93,119 +100,110 @@ async def create_incident(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "media": media_files,
     }
-    result = incidents_collection.insert_one(doc)
+    result = db.incidents.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
-    # Don't return base64 data in response
     doc["media"] = [{"id": m["id"], "filename": m["filename"], "content_type": m["content_type"]} for m in media_files]
     return {"message": "Incident reported", "incident": doc}
 
+# ── List incidents ───────────────────────────────────────────────────────────
+# WHO: admin sees all | staff sees own + assigned | student sees own only
 @router.get("")
 async def get_incidents(
     current_user: dict = Depends(get_current_user),
-    status:   str = Query(None),
-    severity: str = Query(None),
-    category: str = Query(None),
-    date_from: str = Query(None),
-    date_to: str = Query(None),
+    status:      str = Query(None),
+    severity:    str = Query(None),
+    category:    str = Query(None),
+    date_from:   str = Query(None),
+    date_to:     str = Query(None),
     assigned_to: str = Query(None),
-    sort_by: str = Query("created_at"),
-    sort_order: str = Query("desc"),
+    sort_by:     str = Query("created_at"),
+    sort_order:  str = Query("desc"),
 ):
     db = get_db()
     if db is None:
         raise HTTPException(status_code=503, detail="Database unavailable")
+
     role = current_user.get("role", "student")
-    uid = current_user["uid"]
-    incidents_collection = db.incidents
+    uid  = current_user["uid"]
 
     if role == "admin":
-        incidents = list(incidents_collection.find({}))
+        incidents = list(db.incidents.find({}))
     elif role == "staff":
-        own      = list(incidents_collection.find({"reported_by": uid}))
-        assigned = list(incidents_collection.find({"assigned_to": uid}))
-        seen = set()
-        incidents = []
+        own      = list(db.incidents.find({"reported_by": uid}))
+        assigned = list(db.incidents.find({"assigned_to": uid}))
+        seen, incidents = set(), []
         for doc in own + assigned:
-            doc_id = str(doc["_id"])
-            if doc_id not in seen:
-                seen.add(doc_id)
+            key = str(doc["_id"])
+            if key not in seen:
+                seen.add(key)
                 incidents.append(doc)
-    else:
-        incidents = list(incidents_collection.find({"reported_by": uid}))
+    else:  # student
+        incidents = list(db.incidents.find({"reported_by": uid}))
 
     result = []
     for inc in incidents:
         inc["id"] = str(inc["_id"])
         del inc["_id"]
-        if status and inc.get("status") != status:
-            continue
-        if severity and inc.get("severity") != severity:
-            continue
-        if category and inc.get("category", "").lower() != category.lower():
-            continue
-        if assigned_to and inc.get("assigned_to") != assigned_to:
-            continue
+        if status      and inc.get("status")             != status:                    continue
+        if severity    and inc.get("severity")           != severity:                  continue
+        if category    and inc.get("category","").lower()!= category.lower():          continue
+        if assigned_to and inc.get("assigned_to")        != assigned_to:               continue
         if date_from:
             try:
-                if inc.get("created_at", "") < date_from:
-                    continue
-            except:
-                pass
+                if inc.get("created_at","") < date_from: continue
+            except: pass
         if date_to:
             try:
-                if inc.get("created_at", "") > date_to:
-                    continue
-            except:
-                pass
+                if inc.get("created_at","") > date_to: continue
+            except: pass
         result.append(inc)
-    
+
     reverse = sort_order == "desc"
     if sort_by == "severity":
         sev_order = {"high": 3, "medium": 2, "low": 1}
-        result.sort(key=lambda x: sev_order.get(x.get("severity", "low"), 0), reverse=reverse)
+        result.sort(key=lambda x: sev_order.get(x.get("severity","low"), 0), reverse=reverse)
     elif sort_by == "status":
-        result.sort(key=lambda x: x.get("status", ""), reverse=reverse)
+        result.sort(key=lambda x: x.get("status",""), reverse=reverse)
     else:
-        result.sort(key=lambda x: x.get("created_at", ""), reverse=reverse)
-    
+        result.sort(key=lambda x: x.get("created_at",""), reverse=reverse)
+
     return {"incidents": result}
 
-# ── BULK UPDATE (must be before /{incident_id}) ──
+# ── Bulk status update ───────────────────────────────────────────────────────
+# WHO: admin only
 @router.post("/bulk-update")
 async def bulk_update_status(data: BulkStatusUpdate, current_user: dict = Depends(get_current_user)):
-    if current_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admins only")
+    require_admin(current_user)
     if data.status not in ["reported", "in_progress", "resolved"]:
         raise HTTPException(status_code=400, detail="Invalid status")
     db = get_db()
-    incidents_collection = db.incidents
-    updated_count = 0
+    updated = 0
     for inc_id in data.incident_ids:
         try:
-            result = incidents_collection.update_one(
+            r = db.incidents.update_one(
                 {"_id": ObjectId(inc_id)},
                 {"$set": {"status": data.status, "updated_at": datetime.now(timezone.utc).isoformat()}}
             )
-            if result.matched_count > 0:
-                updated_count += 1
-        except:
-            continue
-    return {"message": f"Updated {updated_count} incidents"}
+            if r.matched_count > 0:
+                updated += 1
+        except: continue
+    return {"message": f"Updated {updated} incidents"}
 
-# ── SAVED FILTERS (must be before /{incident_id}) ──
+# ── Saved filters ────────────────────────────────────────────────────────────
+# WHO: any authenticated user (personal filters)
 @router.post("/filters", status_code=201)
 async def save_filter(data: SavedFilterCreate, current_user: dict = Depends(get_current_user)):
     db = get_db()
-    saved_filter = {
+    saved = {
         "id": str(uuid.uuid4()),
         "user_id": current_user["uid"],
         "name": data.name,
         "filters": data.filters,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    db.saved_filters.insert_one(saved_filter)
-    return {"message": "Filter saved", "filter": saved_filter}
+    db.saved_filters.insert_one(saved)
+    return {"message": "Filter saved", "filter": saved}
 
 @router.get("/filters")
 async def get_saved_filters(current_user: dict = Depends(get_current_user)):
@@ -223,12 +221,15 @@ async def delete_saved_filter(filter_id: str, current_user: dict = Depends(get_c
         raise HTTPException(status_code=404, detail="Filter not found")
     return {"message": "Filter deleted"}
 
-# ── DYNAMIC ROUTES (/{incident_id} must come AFTER all static routes) ──
+# ════════════════════════════════════════════════════════════════════════════
+# DYNAMIC ROUTES (/{incident_id} — must come AFTER all static routes)
+# ════════════════════════════════════════════════════════════════════════════
 
+# ── Serve media (no auth — public URL for images/videos) ────────────────────
 @router.get("/{incident_id}/media/{media_id}")
 async def get_media(incident_id: str, media_id: str):
-    db = get_db()
     from fastapi.responses import Response
+    db = get_db()
     try:
         incident = db.incidents.find_one({"_id": ObjectId(incident_id)})
     except:
@@ -237,35 +238,46 @@ async def get_media(incident_id: str, media_id: str):
         raise HTTPException(status_code=404, detail="Not found")
     for m in incident.get("media", []):
         if m["id"] == media_id:
-            data = base64.b64decode(m["data"])
-            return Response(content=data, media_type=m["content_type"])
+            return Response(content=base64.b64decode(m["data"]), media_type=m["content_type"])
     raise HTTPException(status_code=404, detail="Media not found")
 
+# ── Get single incident ──────────────────────────────────────────────────────
+# WHO: admin sees any | staff sees own/assigned | student sees own only
 @router.get("/{incident_id}")
 async def get_incident(incident_id: str, current_user: dict = Depends(get_current_user)):
     db = get_db()
-    incidents_collection = db.incidents
     try:
-        incident = incidents_collection.find_one({"_id": ObjectId(incident_id)})
+        incident = db.incidents.find_one({"_id": ObjectId(incident_id)})
     except:
         raise HTTPException(status_code=404, detail="Incident not found")
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
+
     incident["id"] = str(incident["_id"])
     del incident["_id"]
+
     role = current_user.get("role", "student")
-    if role != "admin" and incident["reported_by"] != current_user["uid"]:
-        raise HTTPException(status_code=403, detail="Unauthorized")
+    uid  = current_user["uid"]
+
+    if role == "admin":
+        pass
+    elif role == "staff" and (incident["reported_by"] == uid or incident.get("assigned_to") == uid):
+        pass
+    elif role == "student" and incident["reported_by"] == uid:
+        pass
+    else:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     return {"incident": incident}
 
+# ── Assign incident ──────────────────────────────────────────────────────────
+# WHO: admin only
 @router.put("/{incident_id}/assign")
 async def assign_incident(incident_id: str, data: AssignUpdate, current_user: dict = Depends(get_current_user)):
-    if current_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admins only")
+    require_admin(current_user)
     db = get_db()
-    incidents_collection = db.incidents
     try:
-        result = incidents_collection.update_one(
+        result = db.incidents.update_one(
             {"_id": ObjectId(incident_id)},
             {"$set": {
                 "assigned_to": data.assigned_to,
@@ -275,73 +287,111 @@ async def assign_incident(incident_id: str, data: AssignUpdate, current_user: di
         )
         if result.matched_count == 0:
             raise HTTPException(status_code=404, detail="Incident not found")
+    except HTTPException:
+        raise
     except:
         raise HTTPException(status_code=404, detail="Incident not found")
     return {"message": "Incident assigned"}
 
+# ── Update status ────────────────────────────────────────────────────────────
+# WHO: admin can set any status
+#      staff can only set in_progress or resolved (only on assigned incidents)
+#      student CANNOT change status
 @router.put("/{incident_id}/status")
 async def update_status(incident_id: str, data: StatusUpdate, current_user: dict = Depends(get_current_user)):
     role = current_user.get("role", "student")
+    uid  = current_user["uid"]
+
+    # Students cannot change status at all
+    if role == "student":
+        raise HTTPException(status_code=403, detail="Students cannot update incident status")
+
+    if data.status not in ["reported", "in_progress", "resolved"]:
+        raise HTTPException(status_code=400, detail="Invalid status")
+
     db = get_db()
-    incidents_collection = db.incidents
     try:
-        incident = incidents_collection.find_one({"_id": ObjectId(incident_id)})
+        incident = db.incidents.find_one({"_id": ObjectId(incident_id)})
     except:
         raise HTTPException(status_code=404, detail="Incident not found")
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
+
     if role == "admin":
+        # Admin can set any status
         pass
-    elif role == "staff" and incident.get("assigned_to") == current_user["uid"]:
-        pass
-    else:
-        raise HTTPException(status_code=403, detail="Not authorized to update this incident")
-    if data.status not in ["reported", "in_progress", "resolved"]:
-        raise HTTPException(status_code=400, detail="Invalid status")
-    incidents_collection.update_one(
+    elif role == "staff":
+        # Staff can only update incidents assigned to them
+        if incident.get("assigned_to") != uid:
+            raise HTTPException(status_code=403, detail="You can only update incidents assigned to you")
+        # Staff can only set in_progress or resolved (not revert to reported)
+        if data.status == "reported":
+            raise HTTPException(status_code=403, detail="Staff cannot revert status to reported")
+
+    db.incidents.update_one(
         {"_id": ObjectId(incident_id)},
         {"$set": {"status": data.status, "updated_at": datetime.now(timezone.utc).isoformat()}}
     )
     return {"message": "Status updated"}
 
+# ── Delete incident ──────────────────────────────────────────────────────────
+# WHO: admin can delete any
+#      student can delete their own ONLY if status is still "reported"
+#      staff CANNOT delete
 @router.delete("/{incident_id}")
 async def delete_incident(incident_id: str, current_user: dict = Depends(get_current_user)):
     role = current_user.get("role", "student")
+    uid  = current_user["uid"]
+
+    if role == "staff":
+        raise HTTPException(status_code=403, detail="Staff cannot delete incidents")
+
     db = get_db()
-    incidents_collection = db.incidents
     try:
-        incident = incidents_collection.find_one({"_id": ObjectId(incident_id)})
+        incident = db.incidents.find_one({"_id": ObjectId(incident_id)})
     except:
         raise HTTPException(status_code=404, detail="Incident not found")
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
+
     if role == "admin":
         pass
-    elif role == "student" and incident.get("reported_by") == current_user["uid"] and incident.get("status") == "reported":
-        pass
-    else:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this incident")
-    incidents_collection.delete_one({"_id": ObjectId(incident_id)})
+    elif role == "student":
+        if incident.get("reported_by") != uid:
+            raise HTTPException(status_code=403, detail="You can only delete your own incidents")
+        if incident.get("status") != "reported":
+            raise HTTPException(status_code=403, detail="Cannot delete an incident that is already in progress or resolved")
+
+    db.incidents.delete_one({"_id": ObjectId(incident_id)})
     db.comments.delete_many({"incident_id": incident_id})
     db.attachments.delete_many({"incident_id": incident_id})
     return {"message": "Incident deleted"}
 
-# ── COMMENTS ──
+# ── Comments ─────────────────────────────────────────────────────────────────
+# WHO: admin, staff, and the student who reported can comment
 @router.post("/{incident_id}/comments", status_code=201)
 async def add_comment(incident_id: str, data: CommentCreate, current_user: dict = Depends(get_current_user)):
     db = get_db()
-    incidents_collection = db.incidents
     try:
-        incident = incidents_collection.find_one({"_id": ObjectId(incident_id)})
+        incident = db.incidents.find_one({"_id": ObjectId(incident_id)})
     except:
         raise HTTPException(status_code=404, detail="Incident not found")
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
+
+    role = current_user.get("role", "student")
+    uid  = current_user["uid"]
+
+    # Students can only comment on their own incidents
+    if role == "student" and incident.get("reported_by") != uid:
+        raise HTTPException(status_code=403, detail="You can only comment on your own incidents")
+
     comment = {
         "id": str(uuid.uuid4()),
         "incident_id": incident_id,
-        "user_id": current_user["uid"],
+        "user_id": uid,
         "user_name": current_user.get("name", "Unknown"),
+        "role": role,
         "text": data.text,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -357,23 +407,30 @@ async def get_comments(incident_id: str, current_user: dict = Depends(get_curren
     comments.sort(key=lambda x: x.get("created_at", ""))
     return {"comments": comments}
 
-# ── ATTACHMENTS ──
+# ── Attachments ──────────────────────────────────────────────────────────────
+# WHO: admin and staff can upload attachments; student can upload to their own incidents
 @router.post("/{incident_id}/attachments", status_code=201)
 async def upload_attachment(incident_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
     db = get_db()
-    incidents_collection = db.incidents
     try:
-        incident = incidents_collection.find_one({"_id": ObjectId(incident_id)})
+        incident = db.incidents.find_one({"_id": ObjectId(incident_id)})
     except:
         raise HTTPException(status_code=404, detail="Incident not found")
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
+
+    role = current_user.get("role", "student")
+    uid  = current_user["uid"]
+
+    if role == "student" and incident.get("reported_by") != uid:
+        raise HTTPException(status_code=403, detail="You can only attach files to your own incidents")
+
     attachment = {
         "id": str(uuid.uuid4()),
         "incident_id": incident_id,
         "filename": file.filename,
         "file_url": f"/uploads/{incident_id}/{file.filename}",
-        "uploaded_by": current_user["uid"],
+        "uploaded_by": uid,
         "uploaded_at": datetime.now(timezone.utc).isoformat(),
     }
     db.attachments.insert_one(attachment)
@@ -386,342 +443,3 @@ async def get_attachments(incident_id: str, current_user: dict = Depends(get_cur
     for a in attachments:
         a.pop("_id", None)
     return {"attachments": attachments}
-
-@router.get("")
-async def get_incidents(
-    current_user: dict = Depends(get_current_user),
-    status:   str = Query(None),
-    severity: str = Query(None),
-    category: str = Query(None),
-    date_from: str = Query(None),
-    date_to: str = Query(None),
-    assigned_to: str = Query(None),
-    sort_by: str = Query("created_at"),
-    sort_order: str = Query("desc"),
-):
-    db = get_db()
-    if db is None:
-        raise HTTPException(status_code=503, detail="Database unavailable")
-    role = current_user.get("role", "student")
-    uid = current_user["uid"]
-    incidents_collection = db.incidents
-
-    if role == "admin":
-        incidents = list(incidents_collection.find({}))
-    elif role == "staff":
-        own      = list(incidents_collection.find({"reported_by": uid}))
-        assigned = list(incidents_collection.find({"assigned_to": uid}))
-        seen = set()
-        incidents = []
-        for doc in own + assigned:
-            doc_id = str(doc["_id"])
-            if doc_id not in seen:
-                seen.add(doc_id)
-                incidents.append(doc)
-    else:
-        incidents = list(incidents_collection.find({"reported_by": uid}))
-
-    # Convert ObjectId to string and apply filters
-    result = []
-    for inc in incidents:
-        inc["id"] = str(inc["_id"])
-        del inc["_id"]
-        
-        if status and inc.get("status") != status:
-            continue
-        if severity and inc.get("severity") != severity:
-            continue
-        if category and inc.get("category", "").lower() != category.lower():
-            continue
-        if assigned_to and inc.get("assigned_to") != assigned_to:
-            continue
-        if date_from:
-            try:
-                if inc.get("created_at", "") < date_from:
-                    continue
-            except:
-                pass
-        if date_to:
-            try:
-                if inc.get("created_at", "") > date_to:
-                    continue
-            except:
-                pass
-        result.append(inc)
-    
-    # Sort
-    reverse = sort_order == "desc"
-    if sort_by == "severity":
-        sev_order = {"high": 3, "medium": 2, "low": 1}
-        result.sort(key=lambda x: sev_order.get(x.get("severity", "low"), 0), reverse=reverse)
-    elif sort_by == "status":
-        result.sort(key=lambda x: x.get("status", ""), reverse=reverse)
-    else:  # created_at
-        result.sort(key=lambda x: x.get("created_at", ""), reverse=reverse)
-    
-    return {"incidents": result}
-
-@router.get("/{incident_id}")
-async def get_incident(incident_id: str, current_user: dict = Depends(get_current_user)):
-    db = get_db()
-    incidents_collection = db.incidents
-    try:
-        incident = incidents_collection.find_one({"_id": ObjectId(incident_id)})
-    except:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    
-    if not incident:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    
-    incident["id"] = str(incident["_id"])
-    del incident["_id"]
-    
-    role = current_user.get("role", "student")
-    if role != "admin" and incident["reported_by"] != current_user["uid"]:
-        raise HTTPException(status_code=403, detail="Unauthorized")
-    return {"incident": incident}
-
-@router.put("/{incident_id}/assign")
-async def assign_incident(incident_id: str, data: AssignUpdate, current_user: dict = Depends(get_current_user)):
-    if current_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admins only")
-    db = get_db()
-    incidents_collection = db.incidents
-    try:
-        result = incidents_collection.update_one(
-            {"_id": ObjectId(incident_id)},
-            {"$set": {
-                "assigned_to": data.assigned_to,
-                "status": "in_progress",
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            }}
-        )
-        if result.matched_count == 0:
-            raise HTTPException(status_code=404, detail="Incident not found")
-    except:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    return {"message": "Incident assigned"}
-
-@router.put("/{incident_id}/status")
-async def update_status(incident_id: str, data: StatusUpdate, current_user: dict = Depends(get_current_user)):
-    role = current_user.get("role", "student")
-    db = get_db()
-    incidents_collection = db.incidents
-    try:
-        incident = incidents_collection.find_one({"_id": ObjectId(incident_id)})
-    except:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    
-    if not incident:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    
-    if role == "admin":
-        pass
-    elif role == "staff" and incident.get("assigned_to") == current_user["uid"]:
-        pass
-    else:
-        raise HTTPException(status_code=403, detail="Not authorized to update this incident")
-    
-    if data.status not in ["reported", "in_progress", "resolved"]:
-        raise HTTPException(status_code=400, detail="Invalid status")
-    
-    incidents_collection.update_one(
-        {"_id": ObjectId(incident_id)},
-        {"$set": {
-            "status": data.status,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }}
-    )
-    return {"message": "Status updated"}
-
-@router.delete("/{incident_id}")
-async def delete_incident(incident_id: str, current_user: dict = Depends(get_current_user)):
-    role = current_user.get("role", "student")
-    db = get_db()
-    incidents_collection = db.incidents
-    try:
-        incident = incidents_collection.find_one({"_id": ObjectId(incident_id)})
-    except:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    
-    if not incident:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    
-    # admin can delete any; student can delete their own unreported ones
-    if role == "admin":
-        pass
-    elif role == "student" and incident.get("reported_by") == current_user["uid"] and incident.get("status") == "reported":
-        pass
-    else:
-        raise HTTPException(status_code=403, detail="Not authorized to delete this incident")
-    
-    incidents_collection.delete_one({"_id": ObjectId(incident_id)})
-    # Also delete comments and attachments
-    db.comments.delete_many({"incident_id": incident_id})
-    db.attachments.delete_many({"incident_id": incident_id})
-    return {"message": "Incident deleted"}
-
-# ── COMMENTS ──
-@router.post("/{incident_id}/comments", status_code=201)
-async def add_comment(incident_id: str, data: CommentCreate, current_user: dict = Depends(get_current_user)):
-    db = get_db()
-    incidents_collection = db.incidents
-    try:
-        incident = incidents_collection.find_one({"_id": ObjectId(incident_id)})
-    except:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    if not incident:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    
-    comment = {
-        "id": str(uuid.uuid4()),
-        "incident_id": incident_id,
-        "user_id": current_user["uid"],
-        "user_name": current_user.get("name", "Unknown"),
-        "text": data.text,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    db.comments.insert_one(comment)
-    return {"message": "Comment added", "comment": comment}
-
-@router.get("/{incident_id}/comments")
-async def get_comments(incident_id: str, current_user: dict = Depends(get_current_user)):
-    db = get_db()
-    comments = list(db.comments.find({"incident_id": incident_id}))
-    for c in comments:
-        c.pop("_id", None)
-    comments.sort(key=lambda x: x.get("created_at", ""))
-    return {"comments": comments}
-
-# ── ATTACHMENTS ──
-@router.post("/{incident_id}/attachments", status_code=201)
-async def upload_attachment(incident_id: str, file: UploadFile = File(...), current_user: dict = Depends(get_current_user)):
-    db = get_db()
-    incidents_collection = db.incidents
-    try:
-        incident = incidents_collection.find_one({"_id": ObjectId(incident_id)})
-    except:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    if not incident:
-        raise HTTPException(status_code=404, detail="Incident not found")
-    
-    # For demo: just store filename and a fake URL (in production, upload to S3/cloud storage)
-    attachment = {
-        "id": str(uuid.uuid4()),
-        "incident_id": incident_id,
-        "filename": file.filename,
-        "file_url": f"/uploads/{incident_id}/{file.filename}",  # fake URL
-        "uploaded_by": current_user["uid"],
-        "uploaded_at": datetime.now(timezone.utc).isoformat(),
-    }
-    db.attachments.insert_one(attachment)
-    return {"message": "File uploaded", "attachment": attachment}
-
-@router.get("/{incident_id}/attachments")
-async def get_attachments(incident_id: str, current_user: dict = Depends(get_current_user)):
-    db = get_db()
-    attachments = list(db.attachments.find({"incident_id": incident_id}))
-    for a in attachments:
-        a.pop("_id", None)
-    return {"attachments": attachments}
-
-# ── BULK ACTIONS ──
-@router.post("/bulk-update")
-async def bulk_update_status(data: BulkStatusUpdate, current_user: dict = Depends(get_current_user)):
-    if current_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admins only")
-    if data.status not in ["reported", "in_progress", "resolved"]:
-        raise HTTPException(status_code=400, detail="Invalid status")
-    
-    db = get_db()
-    incidents_collection = db.incidents
-    updated_count = 0
-    for inc_id in data.incident_ids:
-        try:
-            result = incidents_collection.update_one(
-                {"_id": ObjectId(inc_id)},
-                {"$set": {"status": data.status, "updated_at": datetime.now(timezone.utc).isoformat()}}
-            )
-            if result.matched_count > 0:
-                updated_count += 1
-        except:
-            continue
-    return {"message": f"Updated {updated_count} incidents"}
-
-# ── EXPORT ──
-@router.get("/export")
-async def export_incidents(
-    format: str = Query("csv"),
-    current_user: dict = Depends(get_current_user),
-):
-    db = get_db()
-    role = current_user.get("role", "student")
-    uid = current_user["uid"]
-    incidents_collection = db.incidents
-
-    if role == "admin":
-        incidents = list(incidents_collection.find({}))
-    elif role == "staff":
-        own = list(incidents_collection.find({"reported_by": uid}))
-        assigned = list(incidents_collection.find({"assigned_to": uid}))
-        seen = set()
-        incidents = []
-        for doc in own + assigned:
-            doc_id = str(doc["_id"])
-            if doc_id not in seen:
-                seen.add(doc_id)
-                incidents.append(doc)
-    else:
-        incidents = list(incidents_collection.find({"reported_by": uid}))
-
-    for inc in incidents:
-        inc["id"] = str(inc["_id"])
-        del inc["_id"]
-
-    if format == "csv":
-        output = io.StringIO()
-        if incidents:
-            fieldnames = ["id", "title", "description", "category", "location", "severity", "status", "reported_by", "assigned_to", "created_at"]
-            writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
-            writer.writeheader()
-            for inc in incidents:
-                writer.writerow(inc)
-        
-        output.seek(0)
-        return StreamingResponse(
-            iter([output.getvalue()]),
-            media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=incidents.csv"}
-        )
-    else:
-        raise HTTPException(status_code=400, detail="Only CSV export supported")
-
-# ── SAVED FILTERS ──
-@router.post("/filters", status_code=201)
-async def save_filter(data: SavedFilterCreate, current_user: dict = Depends(get_current_user)):
-    db = get_db()
-    saved_filter = {
-        "id": str(uuid.uuid4()),
-        "user_id": current_user["uid"],
-        "name": data.name,
-        "filters": data.filters,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    db.saved_filters.insert_one(saved_filter)
-    return {"message": "Filter saved", "filter": saved_filter}
-
-@router.get("/filters")
-async def get_saved_filters(current_user: dict = Depends(get_current_user)):
-    db = get_db()
-    filters = list(db.saved_filters.find({"user_id": current_user["uid"]}))
-    for f in filters:
-        f.pop("_id", None)
-    return {"filters": filters}
-
-@router.delete("/filters/{filter_id}")
-async def delete_saved_filter(filter_id: str, current_user: dict = Depends(get_current_user)):
-    db = get_db()
-    result = db.saved_filters.delete_one({"id": filter_id, "user_id": current_user["uid"]})
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="Filter not found")
-    return {"message": "Filter deleted"}
