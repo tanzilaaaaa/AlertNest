@@ -1,14 +1,12 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, Form
 from pydantic import BaseModel, Field
 from app.database import get_db
 from app.utils.auth import get_current_user
 from datetime import datetime, timezone
 from bson import ObjectId
 from typing import List, Optional
-import io
-import csv
 import uuid
+import base64
 
 router = APIRouter(prefix="/api/incidents", tags=["incidents"])
 
@@ -57,23 +55,49 @@ def classify_severity(description: str) -> str:
     return 'low'
 
 @router.post("", status_code=201)
-async def create_incident(data: IncidentCreate, current_user: dict = Depends(get_current_user)):
+async def create_incident(
+    title: str = Form(...),
+    description: str = Form(...),
+    category: str = Form(...),
+    location: str = Form(...),
+    media: List[UploadFile] = File(default=[]),
+    current_user: dict = Depends(get_current_user)
+):
     db = get_db()
     incidents_collection = db.incidents
+
+    # Process uploaded media files (store as base64 for demo; use cloud storage in production)
+    media_files = []
+    for f in media:
+        content = await f.read()
+        # Limit file size to 10MB
+        if len(content) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail=f"File {f.filename} exceeds 10MB limit")
+        encoded = base64.b64encode(content).decode('utf-8')
+        media_files.append({
+            "id": str(uuid.uuid4()),
+            "filename": f.filename,
+            "content_type": f.content_type,
+            "data": encoded,
+        })
+
     doc = {
-        "title": data.title,
-        "description": data.description,
-        "category": data.category,
-        "location": data.location,
-        "severity": classify_severity(data.description),
+        "title": title,
+        "description": description,
+        "category": category,
+        "location": location,
+        "severity": classify_severity(description),
         "status": "reported",
         "reported_by": current_user["uid"],
         "assigned_to": None,
         "created_at": datetime.now(timezone.utc).isoformat(),
+        "media": media_files,
     }
     result = incidents_collection.insert_one(doc)
     doc["id"] = str(result.inserted_id)
     doc.pop("_id", None)
+    # Don't return base64 data in response
+    doc["media"] = [{"id": m["id"], "filename": m["filename"], "content_type": m["content_type"]} for m in media_files]
     return {"message": "Incident reported", "incident": doc}
 
 @router.get("")
@@ -147,53 +171,6 @@ async def get_incidents(
     
     return {"incidents": result}
 
-# ── EXPORT (must be before /{incident_id}) ──
-@router.get("/export")
-async def export_incidents(
-    format: str = Query("csv"),
-    current_user: dict = Depends(get_current_user),
-):
-    db = get_db()
-    role = current_user.get("role", "student")
-    uid = current_user["uid"]
-    incidents_collection = db.incidents
-
-    if role == "admin":
-        incidents = list(incidents_collection.find({}))
-    elif role == "staff":
-        own = list(incidents_collection.find({"reported_by": uid}))
-        assigned = list(incidents_collection.find({"assigned_to": uid}))
-        seen = set()
-        incidents = []
-        for doc in own + assigned:
-            doc_id = str(doc["_id"])
-            if doc_id not in seen:
-                seen.add(doc_id)
-                incidents.append(doc)
-    else:
-        incidents = list(incidents_collection.find({"reported_by": uid}))
-
-    for inc in incidents:
-        inc["id"] = str(inc["_id"])
-        del inc["_id"]
-
-    if format == "csv":
-        output = io.StringIO()
-        if incidents:
-            fieldnames = ["id", "title", "description", "category", "location", "severity", "status", "reported_by", "assigned_to", "created_at"]
-            writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction='ignore')
-            writer.writeheader()
-            for inc in incidents:
-                writer.writerow(inc)
-        output.seek(0)
-        return StreamingResponse(
-            iter([output.getvalue()]),
-            media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=incidents.csv"}
-        )
-    else:
-        raise HTTPException(status_code=400, detail="Only CSV export supported")
-
 # ── BULK UPDATE (must be before /{incident_id}) ──
 @router.post("/bulk-update")
 async def bulk_update_status(data: BulkStatusUpdate, current_user: dict = Depends(get_current_user)):
@@ -247,6 +224,22 @@ async def delete_saved_filter(filter_id: str, current_user: dict = Depends(get_c
     return {"message": "Filter deleted"}
 
 # ── DYNAMIC ROUTES (/{incident_id} must come AFTER all static routes) ──
+
+@router.get("/{incident_id}/media/{media_id}")
+async def get_media(incident_id: str, media_id: str, current_user: dict = Depends(get_current_user)):
+    db = get_db()
+    from fastapi.responses import Response
+    try:
+        incident = db.incidents.find_one({"_id": ObjectId(incident_id)})
+    except:
+        raise HTTPException(status_code=404, detail="Not found")
+    if not incident:
+        raise HTTPException(status_code=404, detail="Not found")
+    for m in incident.get("media", []):
+        if m["id"] == media_id:
+            data = base64.b64decode(m["data"])
+            return Response(content=data, media_type=m["content_type"])
+    raise HTTPException(status_code=404, detail="Media not found")
 
 @router.get("/{incident_id}")
 async def get_incident(incident_id: str, current_user: dict = Depends(get_current_user)):

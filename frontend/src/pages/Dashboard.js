@@ -233,6 +233,7 @@ export default function Dashboard() {
   const [incidents, setIncidents]     = useState([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [form, setForm]               = useState({ title: '', description: '', category: '', location: '' });
+  const [mediaFiles, setMediaFiles]   = useState([]);
   const [submitting, setSubmitting]   = useState(false);
   const [formError, setFormError]     = useState('');
   const [assignInput, setAssignInput] = useState({});
@@ -359,9 +360,19 @@ export default function Dashboard() {
     e.preventDefault();
     setSubmitting(true); setFormError('');
     try {
-      await createIncident(form);
+      const formData = new FormData();
+      formData.append('title', form.title);
+      formData.append('description', form.description);
+      formData.append('category', form.category);
+      formData.append('location', form.location);
+      mediaFiles.forEach(f => formData.append('media', f));
+
+      await api.post('/api/incidents', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
       setForm({ title: '', description: '', category: '', location: '' });
-      showToast('Incident reported');
+      setMediaFiles([]);
+      showToast('Incident reported', 'success');
       setActive('Dashboard'); load();
     } catch (err) {
       const detail = err?.response?.data?.detail;
@@ -654,21 +665,6 @@ export default function Dashboard() {
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  <button onClick={() => handleExport('csv')} style={{
-                    background: 'transparent',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    padding: '8px 16px',
-                    fontSize: '11px',
-                    color: 'var(--text)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    fontWeight: '500',
-                  }}>
-                    <FaDownload size={10} /> Export CSV
-                  </button>
                   <button onClick={() => setShowAdvancedFilters(!showAdvancedFilters)} style={{
                     background: showAdvancedFilters ? 'rgba(200,135,58,0.15)' : 'transparent',
                     border: `1px solid ${showAdvancedFilters ? 'var(--gold)' : 'var(--border)'}`,
@@ -1070,11 +1066,73 @@ export default function Dashboard() {
                     style={{ resize: 'none', height: '100px', marginTop: '6px' }} />
                 </div>
 
+                {/* Media Upload */}
+                <div style={{ marginTop: '24px', paddingBottom: '28px', borderBottom: `1px solid rgba(200,121,65,0.1)` }}>
+                  <label className="report-label">Photos / Videos <span style={{ color: 'var(--muted)', fontWeight: '400', textTransform: 'none', letterSpacing: 0 }}>(optional)</span></label>
+                  <label style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px',
+                    marginTop: '10px', padding: '20px', border: '2px dashed var(--border)',
+                    borderRadius: '10px', cursor: 'pointer', color: 'var(--muted)', fontSize: '12px',
+                    transition: 'border-color 0.2s, color 0.2s',
+                  }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.color = 'var(--gold)'; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted)'; }}
+                  >
+                    <span style={{ fontSize: '22px' }}>📎</span>
+                    <span>Click to attach photos or videos</span>
+                    <input
+                      type="file"
+                      multiple
+                      accept="image/*,video/*"
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const files = Array.from(e.target.files);
+                        setMediaFiles(prev => [...prev, ...files]);
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+
+                  {/* Preview */}
+                  {mediaFiles.length > 0 && (
+                    <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                      {mediaFiles.map((f, idx) => (
+                        <div key={idx} style={{
+                          position: 'relative', borderRadius: '8px', overflow: 'hidden',
+                          border: '1px solid var(--border)', background: 'var(--bg-dark)',
+                        }}>
+                          {f.type.startsWith('image/') ? (
+                            <img
+                              src={URL.createObjectURL(f)}
+                              alt={f.name}
+                              style={{ width: '80px', height: '80px', objectFit: 'cover', display: 'block' }}
+                            />
+                          ) : (
+                            <div style={{ width: '80px', height: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                              <span style={{ fontSize: '24px' }}>🎥</span>
+                              <span style={{ fontSize: '9px', color: 'var(--muted)', textAlign: 'center', padding: '0 4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '76px' }}>{f.name}</span>
+                            </div>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setMediaFiles(prev => prev.filter((_, i) => i !== idx))}
+                            style={{
+                              position: 'absolute', top: '3px', right: '3px',
+                              background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%',
+                              color: '#fff', width: '18px', height: '18px', cursor: 'pointer',
+                              fontSize: '11px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            }}>×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '28px' }}>
                   <button type="submit" disabled={submitting} style={{ ...btnGold, padding: '12px 32px', fontSize: '11px', opacity: submitting ? 0.6 : 1 }}>
                     {submitting ? 'Submitting...' : 'Submit Report →'}
                   </button>
-                  <button type="button" onClick={() => setActive('Dashboard')}
+                  <button type="button" onClick={() => { setActive('Dashboard'); setMediaFiles([]); }}
                     style={{ background: 'transparent', color: 'var(--muted)', border: 'none', fontSize: '11px', cursor: 'pointer', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                     Cancel
                   </button>

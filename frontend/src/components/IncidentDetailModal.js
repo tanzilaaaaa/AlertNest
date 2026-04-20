@@ -136,6 +136,43 @@ export default function IncidentDetailModal({ incident, onClose, onToast }) {
             </p>
           </div>
 
+          {/* Media */}
+          {incident.media && incident.media.length > 0 && (
+            <div>
+              <h4 style={{ margin: '0 0 10px', fontSize: '11px', fontWeight: '600', color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                Photos / Videos ({incident.media.length})
+              </h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {incident.media.map(m => (
+                  <a
+                    key={m.id}
+                    href={`http://localhost:8000/api/incidents/${incident.id}/media/${m.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={{ textDecoration: 'none' }}
+                  >
+                    {m.content_type?.startsWith('image/') ? (
+                      <img
+                        src={`http://localhost:8000/api/incidents/${incident.id}/media/${m.id}`}
+                        alt={m.filename}
+                        style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '8px', border: '1px solid var(--border)', display: 'block' }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '100px', height: '100px', borderRadius: '8px',
+                        border: '1px solid var(--border)', background: 'var(--bg-dark)',
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                      }}>
+                        <span style={{ fontSize: '28px' }}>🎥</span>
+                        <span style={{ fontSize: '9px', color: 'var(--muted)', textAlign: 'center', padding: '0 6px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '90px' }}>{m.filename}</span>
+                      </div>
+                    )}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Comments */}
           <Comments incidentId={incident.id} onToast={onToast} />
 
