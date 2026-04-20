@@ -20,20 +20,28 @@ export const AuthProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const token = await firebaseUser.getIdToken();
-        // Sync user profile with backend
         try {
           const res = await api.post('/api/auth/sync', {}, {
             headers: { Authorization: `Bearer ${token}` }
           });
           setUser({ ...res.data.user, token });
         } catch {
-          setUser({
-            id: firebaseUser.uid,
-            name: firebaseUser.displayName || firebaseUser.email,
-            email: firebaseUser.email,
-            role: 'student',
-            token
-          });
+          // Backend down — try /me endpoint as fallback
+          try {
+            const res = await api.get('/api/auth/me', {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            setUser({ ...res.data.user, token });
+          } catch {
+            // Complete fallback — at least show the user as logged in
+            setUser({
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || firebaseUser.email,
+              email: firebaseUser.email,
+              role: 'student',
+              token
+            });
+          }
         }
       } else {
         setUser(null);
@@ -66,6 +74,17 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
+  const refreshUser = async () => {
+    if (!auth.currentUser) return;
+    try {
+      const token = await auth.currentUser.getIdToken(true); // force refresh
+      const res = await api.get('/api/auth/me', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setUser({ ...res.data.user, token });
+    } catch {}
+  };
+
   // Get fresh token for API calls
   const getToken = async () => {
     if (auth.currentUser) return auth.currentUser.getIdToken();
@@ -73,7 +92,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, loginWithGoogle, logout, loading, getToken }}>
+    <AuthContext.Provider value={{ user, login, register, loginWithGoogle, logout, loading, getToken, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
