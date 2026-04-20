@@ -7,6 +7,21 @@ from bson import ObjectId
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
+# ── Email domain rules ──────────────────────────────────────────────────────
+STUDENT_DOMAIN = "@student.alertnest.edu"
+STAFF_DOMAIN   = "@staff.alertnest.edu"
+ADMIN_DOMAIN   = "@admin.alertnest.edu"
+
+def get_role_from_email(email: str) -> str:
+    email = email.lower()
+    if email.endswith(ADMIN_DOMAIN):
+        return "admin"
+    if email.endswith(STAFF_DOMAIN):
+        return "staff"
+    if email.endswith(STUDENT_DOMAIN):
+        return "student"
+    return None  # email domain not recognized
+
 class SyncData(BaseModel):
     name: Optional[str] = None
     role: Optional[str] = "student"
@@ -17,9 +32,17 @@ async def sync_user(data: SyncData = SyncData(), current_user: dict = Depends(ge
     if db is None:
         raise HTTPException(status_code=503, detail="Database unavailable")
     uid = current_user["uid"]
-    
-    # Determine provider from Firebase token
-    provider = "email"  # default for email/password
+    email = current_user.get("email", "")
+
+    # Determine role from email domain — this is the source of truth
+    role_from_email = get_role_from_email(email)
+    if role_from_email is None:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Email domain not recognized. Use @student.alertnest.edu, @staff.alertnest.edu, or @admin.alertnest.edu"
+        )
+
+    provider = "email"
     if "firebase" in current_user and "sign_in_provider" in current_user.get("firebase", {}):
         provider = current_user["firebase"]["sign_in_provider"]
 
@@ -29,18 +52,17 @@ async def sync_user(data: SyncData = SyncData(), current_user: dict = Depends(ge
     if not existing_user:
         users_collection.insert_one({
             "_id": uid,
-            "name": data.name or current_user.get("name", current_user.get("email", "")),
-            "email": current_user.get("email", ""),
-            "role": data.role or "student",
+            "name": data.name or current_user.get("name", email),
+            "email": email,
+            "role": role_from_email,
             "provider": provider
         })
     else:
-        # Only update name if provided — never overwrite role on subsequent logins
-        updates = {}
+        # Always sync role from email domain (in case email changed)
+        updates = {"role": role_from_email}
         if data.name and data.name != existing_user.get("name"):
             updates["name"] = data.name
-        if updates:
-            users_collection.update_one({"_id": uid}, {"$set": updates})
+        users_collection.update_one({"_id": uid}, {"$set": updates})
 
     user = users_collection.find_one({"_id": uid})
     return {

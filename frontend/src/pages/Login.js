@@ -82,7 +82,6 @@ export default function Login({ onSwitch, onRoleSelect, roleError }) {
         <div style={{ width: '100%', maxWidth: '360px' }}>
           <h2 style={{ margin: '0 0 6px', fontSize: '26px', fontWeight: '700', color: 'var(--text)' }}>Welcome back</h2>
           <p style={{ margin: '0 0 24px', fontSize: '13px', color: 'var(--muted)' }}>Sign in to your AlertNest account.</p>
-
           {(error || roleError) && (
             <p style={{ color: '#f87171', fontSize: '12px', marginBottom: '16px', background: 'rgba(248,113,113,0.1)', padding: '10px 14px', borderRadius: '6px' }}>
               {error || roleError}

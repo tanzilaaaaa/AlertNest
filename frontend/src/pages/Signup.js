@@ -1,30 +1,48 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import SocialButtons from '../components/SocialButtons';
-import { FaLeaf, FaGraduationCap, FaTools, FaEye, FaEyeSlash } from 'react-icons/fa';
-import { COLORS } from '../utils/colors';
+import { FaLeaf, FaGraduationCap, FaTools, FaCrown, FaEye, FaEyeSlash } from 'react-icons/fa';
+
+const STUDENT_DOMAIN = '@student.alertnest.edu';
+const STAFF_DOMAIN   = '@staff.alertnest.edu';
+const ADMIN_DOMAIN   = '@admin.alertnest.edu';
+
+function getRoleFromEmail(email) {
+  const e = email.toLowerCase();
+  if (e.endsWith(ADMIN_DOMAIN))   return 'admin';
+  if (e.endsWith(STAFF_DOMAIN))   return 'staff';
+  if (e.endsWith(STUDENT_DOMAIN)) return 'student';
+  return null;
+}
 
 export default function Signup({ onSwitch }) {
   const { register } = useAuth();
-  const [form, setForm]     = useState({ name: '', email: '', password: '', role: 'student' });
-  const [error, setError]   = useState('');
+  const [form, setForm]       = useState({ name: '', email: '', password: '' });
+  const [error, setError]     = useState('');
   const [success, setSuccess] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Using CSS variables directly
-  // Using CSS variables directly
-  // Using CSS variables directly
-  // Using CSS variables directly
-  // Using CSS variables directly
-  // Using CSS variables directly
-  // Using CSS variables directly
+  const detectedRole = getRoleFromEmail(form.email);
+
+  const ROLE_INFO = {
+    student: { icon: FaGraduationCap, color: '#93c5fd', label: 'Student',  bg: 'rgba(147,197,253,0.12)' },
+    staff:   { icon: FaTools,         color: '#6ee7b7', label: 'Staff',    bg: 'rgba(110,231,183,0.12)' },
+    admin:   { icon: FaCrown,          color: '#c8873a', label: 'Admin',    bg: 'rgba(200,135,58,0.15)'  },
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(''); setSuccess(''); setLoading(true);
+
+    if (!detectedRole) {
+      setError(`Invalid email domain. Use:\n${STUDENT_DOMAIN} for students\n${STAFF_DOMAIN} for staff\n${ADMIN_DOMAIN} for admins`);
+      setLoading(false);
+      return;
+    }
+
     try {
-      await register(form.name, form.email, form.password, form.role);
+      await register(form.name, form.email, form.password, detectedRole);
       setSuccess('Account created! Logging you in...');
     } catch (err) {
       setError(err.code === 'auth/email-already-in-use' ? 'Email already registered' : err.message);
@@ -34,10 +52,7 @@ export default function Signup({ onSwitch }) {
   const label = { fontSize: '11px', fontWeight: '600', color: 'var(--muted)', letterSpacing: '1px', textTransform: 'uppercase', marginBottom: '8px', display: 'block' };
   const inputSt = { width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: '6px', padding: '12px 14px', fontSize: '13px', color: 'var(--text)', outline: 'none', boxSizing: 'border-box' };
 
-  const ROLES = [
-    { value: 'student', icon: FaGraduationCap, label: 'Student', sub: 'Report incidents' },
-    { value: 'staff',   icon: FaTools,  label: 'Staff',   sub: 'Manage & resolve' },
-  ];
+  const roleInfo = detectedRole ? ROLE_INFO[detectedRole] : null;
 
   return (
     <div style={{ display: 'flex', height: '100vh', fontFamily: "'Segoe UI', system-ui, sans-serif", overflow: 'hidden' }}>
@@ -56,12 +71,20 @@ export default function Signup({ onSwitch }) {
           <h1 style={{ margin: '0 0 4px', fontSize: '52px', fontWeight: '700', color: 'var(--text)', lineHeight: 1.1 }}>Report.</h1>
           <h1 style={{ margin: '0 0 4px', fontSize: '52px', fontWeight: '700', color: 'var(--gold)', lineHeight: 1.1, fontStyle: 'italic' }}>Track.</h1>
           <h1 style={{ margin: '0 0 24px', fontSize: '52px', fontWeight: '700', color: 'var(--text)', lineHeight: 1.1 }}>Resolve.</h1>
-          <p style={{ margin: '0 0 32px', fontSize: '14px', color: 'var(--muted)', lineHeight: 1.7, maxWidth: '320px' }}>
-            Join AlertNest and help keep your campus safe and accountable.
-          </p>
-          <div style={{ display: 'flex', gap: '10px' }}>
-            {['INCIDENTS', 'TRACKING', 'ANALYTICS'].map(t => (
-              <span key={t} style={{ border: '1px solid var(--border)', color: 'var(--muted)', fontSize: '10px', fontWeight: '600', padding: '5px 12px', borderRadius: '4px', letterSpacing: '0.8px' }}>{t}</span>
+
+          {/* Email domain guide */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <p style={{ margin: '0 0 8px', fontSize: '11px', fontWeight: '600', color: 'var(--muted)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Email Domains</p>
+            {Object.entries(ROLE_INFO).map(([role, info]) => (
+              <div key={role} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 12px', background: info.bg, borderRadius: '8px', border: `1px solid ${info.color}30` }}>
+                <info.icon size={13} color={info.color} />
+                <div>
+                  <span style={{ fontSize: '11px', fontWeight: '700', color: info.color }}>{info.label}</span>
+                  <span style={{ fontSize: '10px', color: 'var(--muted)', marginLeft: '8px' }}>
+                    {role === 'student' ? STUDENT_DOMAIN : role === 'staff' ? STAFF_DOMAIN : ADMIN_DOMAIN}
+                  </span>
+                </div>
+              </div>
             ))}
           </div>
         </div>
@@ -80,32 +103,12 @@ export default function Signup({ onSwitch }) {
 
         <div style={{ width: '100%', maxWidth: '360px' }}>
           <h2 style={{ margin: '0 0 6px', fontSize: '26px', fontWeight: '700', color: 'var(--text)' }}>Create account</h2>
-          <p style={{ margin: '0 0 24px', fontSize: '13px', color: 'var(--muted)' }}>Join your AlertNest campus network.</p>
+          <p style={{ margin: '0 0 24px', fontSize: '13px', color: 'var(--muted)' }}>Your role is determined by your email domain.</p>
 
-          {error   && <p style={{ color: '#f87171', fontSize: '12px', marginBottom: '14px', background: 'rgba(248,113,113,0.1)', padding: '10px 14px', borderRadius: '6px' }}>{error}</p>}
+          {error   && <p style={{ color: '#f87171', fontSize: '12px', marginBottom: '14px', background: 'rgba(248,113,113,0.1)', padding: '10px 14px', borderRadius: '6px', whiteSpace: 'pre-line' }}>{error}</p>}
           {success && <p style={{ color: '#6ee7b7', fontSize: '12px', marginBottom: '14px', background: 'rgba(110,231,183,0.1)', padding: '10px 14px', borderRadius: '6px' }}>{success}</p>}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-
-            {/* Role selector */}
-            <div>
-              <label style={label}>I am a</label>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                {ROLES.map(r => (
-                  <button key={r.value} type="button" onClick={() => setForm({ ...form, role: r.value })} style={{
-                    padding: '12px 8px', borderRadius: '8px', border: form.role === r.value ? '1px solid var(--gold)' : '1px solid var(--border)',
-                    background: form.role === r.value ? 'rgba(200,135,58,0.12)' : 'var(--bg-input)',
-                    cursor: 'pointer', textAlign: 'center', transition: 'all 0.15s',
-                  }}>
-                  <div style={{ marginBottom: '4px', display: 'flex', justifyContent: 'center' }}>
-                    <r.icon size={20} color={form.role === r.value ? 'var(--gold)' : 'var(--muted)'} />
-                  </div>
-                    <p style={{ margin: 0, fontSize: '11px', fontWeight: '700', color: form.role === r.value ? 'var(--gold)' : 'var(--text)' }}>{r.label}</p>
-                    <p style={{ margin: 0, fontSize: '10px', color: 'var(--muted)' }}>{r.sub}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
 
             <div>
               <label style={label}>Full Name</label>
@@ -115,8 +118,23 @@ export default function Signup({ onSwitch }) {
 
             <div>
               <label style={label}>Email Address</label>
-              <input type="email" placeholder="you@example.com" value={form.email}
+              <input type="email" placeholder={`e.g. john${STUDENT_DOMAIN}`} value={form.email}
                 onChange={e => setForm({ ...form, email: e.target.value })} required style={inputSt} />
+
+              {/* Role auto-detected badge */}
+              {roleInfo && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', padding: '8px 12px', background: roleInfo.bg, borderRadius: '8px', border: `1px solid ${roleInfo.color}40` }}>
+                  <roleInfo.icon size={13} color={roleInfo.color} />
+                  <span style={{ fontSize: '12px', color: roleInfo.color, fontWeight: '600' }}>
+                    Role detected: {roleInfo.label}
+                  </span>
+                </div>
+              )}
+              {form.email && !roleInfo && (
+                <p style={{ margin: '6px 0 0', fontSize: '11px', color: '#f87171' }}>
+                  Unrecognized domain. Use a valid @alertnest.edu email.
+                </p>
+              )}
             </div>
 
             <div>
@@ -134,16 +152,14 @@ export default function Signup({ onSwitch }) {
               </div>
             </div>
 
-            <button type="submit" disabled={loading} style={{
+            <button type="submit" disabled={loading || !detectedRole} style={{
               width: '100%', background: 'var(--gold)', color: '#fff', border: 'none', borderRadius: '6px',
-              padding: '13px', fontSize: '13px', fontWeight: '700', cursor: 'pointer',
-              letterSpacing: '0.8px', opacity: loading ? 0.7 : 1, marginTop: '4px',
+              padding: '13px', fontSize: '13px', fontWeight: '700', cursor: loading || !detectedRole ? 'not-allowed' : 'pointer',
+              letterSpacing: '0.8px', opacity: loading || !detectedRole ? 0.5 : 1, marginTop: '4px',
             }}>
-              {loading ? 'CREATING...' : 'CREATE ACCOUNT'}
+              {loading ? 'CREATING...' : detectedRole ? `CREATE ${detectedRole.toUpperCase()} ACCOUNT` : 'CREATE ACCOUNT'}
             </button>
           </form>
-
-          <SocialButtons onError={setError} label="Sign Up" />
 
           <p style={{ textAlign: 'center', fontSize: '12px', color: 'var(--muted)', marginTop: '20px' }}>
             Already have an account?{' '}
