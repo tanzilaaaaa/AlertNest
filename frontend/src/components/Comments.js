@@ -10,6 +10,7 @@ export default function Comments({ incidentId, onToast }) {
 
   useEffect(() => {
     loadComments();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incidentId]);
 
   const loadComments = async () => {

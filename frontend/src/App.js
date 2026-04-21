@@ -55,6 +55,7 @@ function AppContent() {
       logout();
       setLoginRole(null);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, loginRole]);
 
   if (loading) return <p className="text-center mt-20" style={{ color: 'var(--muted)' }}>Loading...</p>;

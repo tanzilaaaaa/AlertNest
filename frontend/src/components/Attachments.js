@@ -9,6 +9,7 @@ export default function Attachments({ incidentId, onToast }) {
 
   useEffect(() => {
     loadAttachments();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [incidentId]);
 
   const loadAttachments = async () => {

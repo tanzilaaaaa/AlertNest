@@ -6,7 +6,6 @@ import api from '../services/api';
 import Sidebar from '../components/Sidebar';
 import StatCard from '../components/StatCard';
 import ProgressChart from '../components/ProgressChart';
-import ActivityList from '../components/ActivityList';
 import LoadingSkeleton from '../components/LoadingSkeleton';
 import Toast from '../components/Toast';
 import ConfirmModal from '../components/ConfirmModal';
@@ -229,7 +228,7 @@ export default function Dashboard() {
   const [summary, setSummary]         = useState(null);
   const [recent, setRecent]           = useState([]);
   const [incidents, setIncidents]     = useState([]);
-  const [selectedIdx, setSelectedIdx] = useState(0);
+  const [selectedIdx, setSelectedIdx] = useState(0); // eslint-disable-line no-unused-vars
   const [form, setForm]               = useState({ title: '', description: '', category: '', location: '' });
   const [mediaFiles, setMediaFiles]   = useState([]);
   const [submitting, setSubmitting]   = useState(false);
@@ -349,11 +348,6 @@ export default function Dashboard() {
   useEffect(() => { setPage(1); }, [filterStatus, filterSeverity, searchQuery, dateFrom, dateTo, assignedTo, sortBy, sortOrder]);
 
   if (showProfile) return <Profile onBack={() => setShowProfile(false)} summary={summary} />;
-
-  const activityItems = recent.map(i => ({
-    dot: i.severity || i.status,
-    text: `${i.title} — ${i.category || 'General'} · ${i.status?.replace('_', ' ')}`,
-  }));
 
   // filtered + searched incidents
   const filteredIncidents = incidents.filter(i => {
